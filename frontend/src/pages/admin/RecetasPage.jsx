@@ -52,7 +52,18 @@ export default function RecetasPage() {
   const setRow = (idx, campo, val) =>
     setItems((r) => r.map((it, i) => (i === idx ? { ...it, [campo]: val } : it)));
 
-  const unidadDe = (insumoId) => insumos.find((i) => i.id === Number(insumoId))?.unidad || "";
+  const insumoDe = (insumoId) => insumos.find((i) => i.id === Number(insumoId));
+  // En la receta se escribe en la unidad de receta (pams, cucharada…) si existe;
+  // si no, en la unidad real del insumo. Al vender el backend convierte con el factor.
+  const unidadDe = (insumoId) => {
+    const i = insumoDe(insumoId);
+    return i?.unidadReceta || i?.unidad || "";
+  };
+  const equivalenciaDe = (insumoId) => {
+    const i = insumoDe(insumoId);
+    if (!i?.unidadReceta) return "";
+    return `1 ${i.unidadReceta} = ${i.factorReceta} ${i.unidad}`;
+  };
 
   const guardar = async () => {
     setError("");
@@ -156,12 +167,21 @@ export default function RecetasPage() {
                       onChange={(e) => setRow(idx, "cantidad", e.target.value)}
                       placeholder="cant."
                     />
-                    <span className="w-10 text-xs text-frappe-textSoft">{unidadDe(it.insumoId)}</span>
+                    <span className="w-16 text-xs text-frappe-textSoft" title={equivalenciaDe(it.insumoId)}>{unidadDe(it.insumoId)}</span>
                     <button onClick={() => removeRow(idx)} className="rounded-lg p-2 text-frappe-textSoft transition hover:bg-frappe-bg hover:text-frappe-danger">
                       <Trash2 size={15} />
                     </button>
                   </div>
                 ))}
+                {items.some((it) => equivalenciaDe(it.insumoId)) && (
+                  <p className="mt-1 mb-2 text-xs text-frappe-textSoft">
+                    {items
+                      .filter((it) => equivalenciaDe(it.insumoId))
+                      .map((it) => `${insumoDe(it.insumoId)?.nombre}: ${equivalenciaDe(it.insumoId)}`)
+                      .filter((v, idx, arr) => arr.indexOf(v) === idx)
+                      .join("  ·  ")}
+                  </p>
+                )}
 
                 <button
                   onClick={addRow}

@@ -6,7 +6,7 @@ import { insumosApi } from "../../api/insumos";
 const inputCls =
   "w-full rounded-lg border border-frappe-border bg-frappe-bg px-3 py-2.5 text-sm text-frappe-text outline-none focus:border-frappe-accent";
 const labelCls = "mb-1 block text-sm text-frappe-textSoft";
-const UNIDADES = ["ml", "l", "g", "kg", "unidad", "pams"];
+const UNIDADES = ["ml", "l", "g", "kg", "unidad"];
 
 export default function InsumoFormModal({ modo, insumo, onClose, onSaved }) {
   const esEditar = modo === "editar";
@@ -16,6 +16,11 @@ export default function InsumoFormModal({ modo, insumo, onClose, onSaved }) {
   const [umbralAlerta, setUmbralAlerta] = useState(
     insumo?.umbralAlerta != null ? String(insumo.umbralAlerta) : "0"
   );
+  // Unidad de receta (opcional): ej. escribir "pams" o "cucharada" en las recetas.
+  const [unidadReceta, setUnidadReceta] = useState(insumo?.unidadReceta || "");
+  const [factorReceta, setFactorReceta] = useState(
+    insumo?.factorReceta != null && insumo?.unidadReceta ? String(insumo.factorReceta) : ""
+  );
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
 
@@ -24,12 +29,18 @@ export default function InsumoFormModal({ modo, insumo, onClose, onSaved }) {
     setError("");
     setGuardando(true);
     try {
+      const ur = unidadReceta.trim();
+      const receta = {
+        unidadReceta: ur || null,
+        factorReceta: ur ? Number(factorReceta) || 1 : 1,
+      };
       let guardado;
       if (esEditar) {
         guardado = await insumosApi.update(insumo.id, {
           nombre: nombre.trim(),
           unidad,
           umbralAlerta: Number(umbralAlerta) || 0,
+          ...receta,
         });
       } else {
         guardado = await insumosApi.create({
@@ -37,6 +48,7 @@ export default function InsumoFormModal({ modo, insumo, onClose, onSaved }) {
           unidad,
           stockInicial: Number(stockInicial) || 0,
           umbralAlerta: Number(umbralAlerta) || 0,
+          ...receta,
         });
       }
       onSaved(guardado);
@@ -77,6 +89,30 @@ export default function InsumoFormModal({ modo, insumo, onClose, onSaved }) {
             <label className={labelCls}>Umbral de alerta (avisa si baja de esto)</label>
             <input type="number" step="any" min="0" className={inputCls} value={umbralAlerta} onChange={(e) => setUmbralAlerta(e.target.value)} placeholder="0" />
           </div>
+        </div>
+
+        {/* Unidad de receta (opcional): permite escribir la receta en otra medida */}
+        <div className="mb-3 rounded-lg border border-frappe-border bg-frappe-bg/50 p-3">
+          <div className="mb-2 text-sm font-semibold text-frappe-text">Unidad para recetas (opcional)</div>
+          <p className="mb-2 text-xs text-frappe-textSoft">
+            Si en las recetas prefieres medir este insumo en otra unidad (ej. <b>pams</b>, <b>cucharada</b>),
+            indícala y cuánto equivale en {unidad}. El stock sigue en {unidad}.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Unidad de receta</label>
+              <input className={inputCls} value={unidadReceta} onChange={(e) => setUnidadReceta(e.target.value)} placeholder="pams, cucharada…" />
+            </div>
+            <div>
+              <label className={labelCls}>1 {unidadReceta.trim() || "unidad"} = ? {unidad}</label>
+              <input type="number" step="any" min="0" className={inputCls} value={factorReceta} onChange={(e) => setFactorReceta(e.target.value)} placeholder={`ej. 10`} disabled={!unidadReceta.trim()} />
+            </div>
+          </div>
+          {unidadReceta.trim() && Number(factorReceta) > 0 && (
+            <p className="mt-2 text-xs text-frappe-accentDark">
+              1 {unidadReceta.trim()} = {Number(factorReceta)} {unidad} · en recetas escribes {unidadReceta.trim()}, el stock descuenta {unidad}.
+            </p>
+          )}
         </div>
 
         <div className="mt-2 flex gap-2">

@@ -159,15 +159,19 @@ const registrar = asyncHandler(async (req, res) => {
     // --- Fase 3: descontar insumos según la receta de cada producto ---
     const prodIds = [...new Set(lineas.map((l) => l.productoId))];
     const { rows: recetas } = await client.query(
-      "SELECT producto_id, insumo_id, cantidad FROM receta_item WHERE producto_id = ANY($1::int[])",
+      `SELECT r.producto_id, r.insumo_id, r.cantidad, i.factor_receta
+         FROM receta_item r JOIN insumo i ON i.id = r.insumo_id
+        WHERE r.producto_id = ANY($1::int[])`,
       [prodIds]
     );
     // Acumular el consumo total por insumo (una venta puede repetir insumos).
+    // La cantidad de la receta está en su unidad de receta -> se multiplica por
+    // factor_receta para obtener la unidad real del insumo (la del stock).
     const consumoPorInsumo = new Map();
     for (const l of lineas) {
       for (const r of recetas) {
         if (r.producto_id !== l.productoId) continue;
-        const total = Number(r.cantidad) * l.cantidad;
+        const total = Number(r.cantidad) * Number(r.factor_receta) * l.cantidad;
         consumoPorInsumo.set(r.insumo_id, (consumoPorInsumo.get(r.insumo_id) || 0) + total);
       }
     }
@@ -388,14 +392,16 @@ const registrarConvenio = asyncHandler(async (req, res) => {
 
     // Descontar insumos igual que una venta normal.
     const { rows: recetas } = await client.query(
-      "SELECT producto_id, insumo_id, cantidad FROM receta_item WHERE producto_id = ANY($1::int[])",
+      `SELECT r.producto_id, r.insumo_id, r.cantidad, i.factor_receta
+         FROM receta_item r JOIN insumo i ON i.id = r.insumo_id
+        WHERE r.producto_id = ANY($1::int[])`,
       [ids]
     );
     const consumoPorInsumo = new Map();
     for (const l of lineas) {
       for (const r of recetas) {
         if (r.producto_id !== l.productoId) continue;
-        consumoPorInsumo.set(r.insumo_id, (consumoPorInsumo.get(r.insumo_id) || 0) + Number(r.cantidad) * l.cantidad);
+        consumoPorInsumo.set(r.insumo_id, (consumoPorInsumo.get(r.insumo_id) || 0) + Number(r.cantidad) * Number(r.factor_receta) * l.cantidad);
       }
     }
     const alertas = [];

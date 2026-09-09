@@ -3,13 +3,20 @@ const { pool, query } = require("../../config/db");
 const { HttpError } = require("../../utils/errors");
 const { asyncHandler } = require("../../utils/asyncHandler");
 
-const UNIDADES = ["ml", "l", "g", "kg", "unidad", "pams"];
+const UNIDADES = ["ml", "l", "g", "kg", "unidad"];
+
+// Campos opcionales para escribir recetas en otra unidad (ej. pams, cucharada).
+const recetaFields = {
+  unidadReceta: z.string().trim().max(20).nullable().optional(),
+  factorReceta: z.number().positive("El factor debe ser mayor a 0").optional(),
+};
 
 const createSchema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio"),
   unidad: z.enum(UNIDADES, { message: "Unidad inválida" }),
   stockInicial: z.number().min(0, "No puede ser negativo").optional(),
   umbralAlerta: z.number().min(0, "No puede ser negativo").optional(),
+  ...recetaFields,
 });
 
 const updateSchema = z
@@ -18,6 +25,7 @@ const updateSchema = z
     unidad: z.enum(UNIDADES, { message: "Unidad inválida" }).optional(),
     umbralAlerta: z.number().min(0).optional(),
     activo: z.boolean().optional(),
+    ...recetaFields,
   })
   .refine((d) => Object.keys(d).length > 0, {
     message: "Debes enviar al menos un campo para actualizar",
@@ -36,11 +44,20 @@ const publicInsumo = (i) => ({
   id: i.id,
   nombre: i.nombre,
   unidad: i.unidad,
+  unidadReceta: i.unidad_receta || null,
+  factorReceta: Number(i.factor_receta),
   stockActual: Number(i.stock_actual),
   umbralAlerta: Number(i.umbral_alerta),
   activo: i.activo,
   stockBajo: Number(i.stock_actual) <= Number(i.umbral_alerta),
 });
+
+// Normaliza los campos de receta: si no hay unidad de receta, el factor vuelve a 1.
+function normalizarReceta(unidadReceta, factorReceta) {
+  const ur = unidadReceta && unidadReceta.trim() ? unidadReceta.trim() : null;
+  const fr = ur ? (factorReceta && factorReceta > 0 ? factorReceta : 1) : 1;
+  return { ur, fr };
+}
 
 async function getInsumoDelLocal(id, localId) {
   const { rows } = await query(
@@ -68,17 +85,18 @@ const list = asyncHandler(async (req, res) => {
 
 // POST /api/insumos  (crea insumo; si trae stockInicial, registra un ingreso)
 const create = asyncHandler(async (req, res) => {
-  const { nombre, unidad, stockInicial = 0, umbralAlerta = 0 } = req.body;
+  const { nombre, unidad, stockInicial = 0, umbralAlerta = 0, unidadReceta, factorReceta } = req.body;
   const localId = req.user.localId;
+  const { ur, fr } = normalizarReceta(unidadReceta, factorReceta);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     let insumo;
     try {
       const { rows } = await client.query(
-        `INSERT INTO insumo (local_id, nombre, unidad, stock_actual, umbral_alerta)
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [localId, nombre, unidad, stockInicial, umbralAlerta]
+        `INSERT INTO insumo (local_id, nombre, unidad, stock_actual, umbral_alerta, unidad_receta, factor_receta)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [localId, nombre, unidad, stockInicial, umbralAlerta, ur, fr]
       );
       insumo = rows[0];
     } catch (err) {
@@ -109,7 +127,7 @@ const update = asyncHandler(async (req, res) => {
   const actual = await getInsumoDelLocal(id, localId);
   if (!actual) throw new HttpError(404, "Insumo no encontrado");
 
-  const { nombre, unidad, umbralAlerta, activo } = req.body;
+  const { nombre, unidad, umbralAlerta, activo, unidadReceta, factorReceta } = req.body;
   const sets = [];
   const values = [];
   let i = 1;
@@ -117,6 +135,15 @@ const update = asyncHandler(async (req, res) => {
   if (unidad !== undefined) { sets.push(`unidad = $${i++}`); values.push(unidad); }
   if (umbralAlerta !== undefined) { sets.push(`umbral_alerta = $${i++}`); values.push(umbralAlerta); }
   if (activo !== undefined) { sets.push(`activo = $${i++}`); values.push(activo); }
+  // Unidad de receta: si se envía, se normaliza (sin unidad => factor 1).
+  if (unidadReceta !== undefined || factorReceta !== undefined) {
+    const { ur, fr } = normalizarReceta(
+      unidadReceta !== undefined ? unidadReceta : actual.unidad_receta,
+      factorReceta !== undefined ? factorReceta : Number(actual.factor_receta)
+    );
+    sets.push(`unidad_receta = $${i++}`); values.push(ur);
+    sets.push(`factor_receta = $${i++}`); values.push(fr);
+  }
   sets.push("updated_at = now()");
   values.push(id, localId);
   try {
