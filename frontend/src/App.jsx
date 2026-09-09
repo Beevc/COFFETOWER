@@ -5,6 +5,7 @@ import Login from "./pages/Login";
 import AdminLayout from "./pages/admin/AdminLayout";
 import UsersPage from "./pages/admin/UsersPage";
 import ProductsPage from "./pages/admin/ProductsPage";
+import CategoriasPage from "./pages/admin/CategoriasPage";
 import VentasPage from "./pages/admin/VentasPage";
 import InsumosPage from "./pages/admin/InsumosPage";
 import RecetasPage from "./pages/admin/RecetasPage";
@@ -59,6 +60,7 @@ export default function App() {
             <Route path="estadisticas" element={<EstadisticasPage />} />
             <Route path="usuarios" element={<UsersPage />} />
             <Route path="productos" element={<ProductsPage />} />
+            <Route path="categorias" element={<CategoriasPage />} />
             <Route path="insumos" element={<InsumosPage />} />
             <Route path="recetas" element={<RecetasPage />} />
             <Route path="promociones" element={<PromocionesPage />} />

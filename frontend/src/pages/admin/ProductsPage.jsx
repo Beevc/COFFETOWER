@@ -139,7 +139,7 @@ export default function ProductsPage() {
                 </div>
                 <div className="truncate text-xs text-frappe-textSoft">
                   {p.sku}
-                  {p.categoria ? ` · ${p.categoria}` : ""}
+                  {p.categoriaPath?.length ? ` · ${p.categoriaPath.join(" › ")}` : ""}
                 </div>
               </div>
 
