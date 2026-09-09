@@ -8,6 +8,9 @@ const cajaRoutes = require("./modules/caja/caja.routes");
 const ventasRoutes = require("./modules/ventas/ventas.routes");
 const insumosRoutes = require("./modules/insumos/insumos.routes");
 const recetasRoutes = require("./modules/recetas/recetas.routes");
+const estadisticasRoutes = require("./modules/estadisticas/estadisticas.routes");
+const promocionesRoutes = require("./modules/promociones/promociones.routes");
+const fidelidadRoutes = require("./modules/fidelidad/fidelidad.routes");
 const { errorHandler, notFound } = require("./middleware/errorHandler");
 
 const app = express();
@@ -29,6 +32,9 @@ app.use("/api/caja", cajaRoutes);
 app.use("/api/ventas", ventasRoutes);
 app.use("/api/insumos", insumosRoutes);
 app.use("/api/recetas", recetasRoutes);
+app.use("/api/estadisticas", estadisticasRoutes);
+app.use("/api/promociones", promocionesRoutes);
+app.use("/api/fidelidad", fidelidadRoutes);
 
 // 404 + manejo de errores (siempre al final).
 app.use(notFound);

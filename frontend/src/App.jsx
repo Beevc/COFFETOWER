@@ -8,6 +8,10 @@ import ProductsPage from "./pages/admin/ProductsPage";
 import VentasPage from "./pages/admin/VentasPage";
 import InsumosPage from "./pages/admin/InsumosPage";
 import RecetasPage from "./pages/admin/RecetasPage";
+import EstadisticasPage from "./pages/admin/EstadisticasPage";
+import PromocionesPage from "./pages/admin/PromocionesPage";
+import FidelidadPage from "./pages/admin/FidelidadPage";
+import ConvenioPage from "./pages/admin/ConvenioPage";
 import CajeroLayout from "./pages/cajero/CajeroLayout";
 import VenderPage from "./pages/cajero/VenderPage";
 import CajaPage from "./pages/cajero/CajaPage";
@@ -51,11 +55,15 @@ export default function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Navigate to="usuarios" replace />} />
+            <Route index element={<Navigate to="estadisticas" replace />} />
+            <Route path="estadisticas" element={<EstadisticasPage />} />
             <Route path="usuarios" element={<UsersPage />} />
             <Route path="productos" element={<ProductsPage />} />
             <Route path="insumos" element={<InsumosPage />} />
             <Route path="recetas" element={<RecetasPage />} />
+            <Route path="promociones" element={<PromocionesPage />} />
+            <Route path="fidelidad" element={<FidelidadPage />} />
+            <Route path="convenio" element={<ConvenioPage />} />
             <Route path="ventas" element={<VentasPage />} />
           </Route>
 

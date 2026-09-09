@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Plus, Minus, Search, AlertTriangle, Loader2 } from "lucide-react";
+import { Plus, Minus, Search, AlertTriangle, Loader2, User, X, Star } from "lucide-react";
 import { productsApi } from "../../api/products";
 import { ventasApi } from "../../api/ventas";
+import { fidelidadApi } from "../../api/fidelidad";
 import { money } from "../../utils/format";
 import { useCaja } from "./CajaContext";
 import Comprobante from "./Comprobante";
@@ -22,6 +23,11 @@ export default function VenderPage() {
   const [comprobante, setComprobante] = useState(null);
   const [error, setError] = useState("");
   const [pagando, setPagando] = useState(false);
+  // Fidelidad: cliente opcional asociado a la venta
+  const [cliente, setCliente] = useState(null);
+  const [cliQuery, setCliQuery] = useState("");
+  const [cliResultados, setCliResultados] = useState([]);
+  const [buscandoCli, setBuscandoCli] = useState(false);
 
   useEffect(() => {
     productsApi
@@ -30,6 +36,21 @@ export default function VenderPage() {
       .catch(() => setError("No se pudieron cargar los productos"))
       .finally(() => setCargando(false));
   }, []);
+
+  // Búsqueda de clientes (fidelidad) con debounce.
+  useEffect(() => {
+    if (cliente || cliQuery.trim().length < 2) {
+      setCliResultados([]);
+      return;
+    }
+    setBuscandoCli(true);
+    const t = setTimeout(() => {
+      fidelidadApi.listClientes(cliQuery.trim())
+        .then(setCliResultados)
+        .finally(() => setBuscandoCli(false));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [cliQuery, cliente]);
 
   const filtrados = productos.filter(
     (p) =>
@@ -59,9 +80,11 @@ export default function VenderPage() {
     setPagando(true);
     try {
       const items = cart.map((i) => ({ productoId: i.id, cantidad: i.cantidad }));
-      const { venta, alertas } = await ventasApi.registrar(medioPago, items);
-      setComprobante({ ...venta, alertas });
+      const { venta, alertas, beneficio } = await ventasApi.registrar(medioPago, items, cliente?.id);
+      setComprobante({ ...venta, alertas, beneficio });
       setCart([]);
+      setCliente(null);
+      setCliQuery("");
       refrescar(); // actualiza totales de caja
     } catch (err) {
       setError(err.response?.data?.error || "No se pudo registrar la venta");
@@ -145,6 +168,59 @@ export default function VenderPage() {
 
       {cart.length > 0 && (
         <div className="sticky bottom-2 rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-lg">
+          {/* Cliente (fidelidad) */}
+          <div className="mb-3">
+            {cliente ? (
+              <div className="flex items-center justify-between rounded-lg bg-frappe-accentSoft px-3 py-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <User size={14} className="text-frappe-accentDark" />
+                  <span className="font-semibold text-frappe-text">{cliente.nombre}</span>
+                  <span className="text-xs text-frappe-textSoft">({cliente.comprasContador} compras)</span>
+                  {cliente.beneficioDisponible && (
+                    <span className="flex items-center gap-1 rounded-full bg-frappe-surface px-2 py-0.5 text-xs font-semibold text-frappe-accentDark">
+                      <Star size={10} /> beneficio
+                    </span>
+                  )}
+                </div>
+                <button onClick={() => { setCliente(null); setCliQuery(""); }} className="text-frappe-textSoft hover:text-frappe-danger">
+                  <X size={15} />
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-frappe-textSoft" />
+                <input
+                  value={cliQuery}
+                  onChange={(e) => setCliQuery(e.target.value)}
+                  placeholder="Cliente fidelidad (opcional)"
+                  className="w-full rounded-lg border border-frappe-border bg-frappe-bg py-2 pl-9 pr-3 text-sm outline-none focus:border-frappe-accent"
+                />
+                {cliQuery.trim().length >= 2 && (
+                  <div className="absolute z-10 mt-1 max-h-44 w-full overflow-auto rounded-lg border border-frappe-border bg-frappe-surface shadow-lg">
+                    {buscandoCli ? (
+                      <div className="px-3 py-2 text-xs text-frappe-textSoft">Buscando…</div>
+                    ) : cliResultados.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-frappe-textSoft">Sin resultados</div>
+                    ) : (
+                      cliResultados.map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => { setCliente(c); setCliResultados([]); }}
+                          className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-frappe-bg"
+                        >
+                          <span className="text-frappe-text">{c.nombre}</span>
+                          <span className="text-xs text-frappe-textSoft">
+                            {c.comprasContador}{c.beneficioDisponible ? " ⭐" : ""}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="mb-2 text-sm font-semibold text-frappe-text">Venta actual</div>
           {cart.map((i) => (
             <div key={i.id} className="flex items-center justify-between py-1.5">

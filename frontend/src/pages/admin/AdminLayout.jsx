@@ -1,13 +1,17 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Coffee, LogOut, Users, Package, Wallet, Boxes, BookOpen } from "lucide-react";
+import { Coffee, LogOut, Users, Package, Wallet, Boxes, BookOpen, BarChart3, Tag, Star, Gift } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 
 const navItems = [
-  { to: "/admin/usuarios", label: "Usuarios", icon: Users },
+  { to: "/admin/estadisticas", label: "Estadísticas", icon: BarChart3 },
+  { to: "/admin/ventas", label: "Ventas", icon: Wallet },
   { to: "/admin/productos", label: "Productos", icon: Package },
   { to: "/admin/insumos", label: "Insumos", icon: Boxes },
   { to: "/admin/recetas", label: "Recetas", icon: BookOpen },
-  { to: "/admin/ventas", label: "Ventas", icon: Wallet },
+  { to: "/admin/promociones", label: "Promociones", icon: Tag },
+  { to: "/admin/fidelidad", label: "Fidelidad", icon: Star },
+  { to: "/admin/convenio", label: "Convenio", icon: Gift },
+  { to: "/admin/usuarios", label: "Usuarios", icon: Users },
 ];
 
 export default function AdminLayout() {

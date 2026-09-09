@@ -47,6 +47,12 @@ export default function Comprobante({ venta, onNueva, onAnular }) {
 
       <div className="my-3 border-t border-dashed border-frappe-border" />
 
+      {venta.descuento > 0 && (
+        <div className="flex justify-between text-sm text-frappe-success">
+          <span>Descuento</span>
+          <span>-{money(venta.descuento)}</span>
+        </div>
+      )}
       <div className="flex justify-between text-base font-bold text-frappe-text">
         <span>Total</span>
         <span>{money(venta.total)}</span>
@@ -54,6 +60,11 @@ export default function Comprobante({ venta, onNueva, onAnular }) {
       <div className="mt-1 text-xs text-frappe-textSoft">
         Medio de pago: {MEDIO_LABEL[venta.medioPago] || venta.medioPago}
       </div>
+      {venta.beneficio && (
+        <div className="mt-2 rounded-lg bg-frappe-accentSoft px-3 py-2 text-center text-xs font-semibold text-frappe-accentDark">
+          🎉 {venta.beneficio}
+        </div>
+      )}
 
       {anulada && (
         <div className="mt-3 rounded-lg bg-frappe-dangerSoft px-3 py-2 text-center text-sm font-semibold text-frappe-danger">
