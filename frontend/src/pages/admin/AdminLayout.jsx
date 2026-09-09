@@ -1,10 +1,12 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Coffee, LogOut, Users, Package, Wallet } from "lucide-react";
+import { Coffee, LogOut, Users, Package, Wallet, Boxes, BookOpen } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 
 const navItems = [
   { to: "/admin/usuarios", label: "Usuarios", icon: Users },
   { to: "/admin/productos", label: "Productos", icon: Package },
+  { to: "/admin/insumos", label: "Insumos", icon: Boxes },
+  { to: "/admin/recetas", label: "Recetas", icon: BookOpen },
   { to: "/admin/ventas", label: "Ventas", icon: Wallet },
 ];
 
@@ -40,13 +42,13 @@ export default function AdminLayout() {
           </div>
         </div>
 
-        <nav className="mx-auto flex max-w-4xl gap-1 px-5">
+        <nav className="mx-auto flex max-w-4xl gap-1 overflow-x-auto px-5">
           {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
               className={({ isActive }) =>
-                `flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition ${
+                `flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition ${
                   isActive
                     ? "border-frappe-accent text-frappe-accentDark"
                     : "border-transparent text-frappe-textSoft hover:text-frappe-text"

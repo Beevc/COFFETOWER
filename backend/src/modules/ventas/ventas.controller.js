@@ -95,8 +95,49 @@ const registrar = asyncHandler(async (req, res) => {
       );
     }
 
+    // --- Fase 3: descontar insumos según la receta de cada producto ---
+    const prodIds = [...new Set(lineas.map((l) => l.productoId))];
+    const { rows: recetas } = await client.query(
+      "SELECT producto_id, insumo_id, cantidad FROM receta_item WHERE producto_id = ANY($1::int[])",
+      [prodIds]
+    );
+    // Acumular el consumo total por insumo (una venta puede repetir insumos).
+    const consumoPorInsumo = new Map();
+    for (const l of lineas) {
+      for (const r of recetas) {
+        if (r.producto_id !== l.productoId) continue;
+        const total = Number(r.cantidad) * l.cantidad;
+        consumoPorInsumo.set(r.insumo_id, (consumoPorInsumo.get(r.insumo_id) || 0) + total);
+      }
+    }
+
+    const alertas = [];
+    for (const [insumoId, consumo] of consumoPorInsumo) {
+      // Movimiento de consumo (cantidad negativa) trazado a la venta.
+      await client.query(
+        `INSERT INTO movimiento_inventario (local_id, insumo_id, tipo, cantidad, venta_id, usuario_id, motivo)
+         VALUES ($1, $2, 'consumo', $3, $4, $5, $6)`,
+        [localId, insumoId, -consumo, venta.id, req.user.id, `Venta #${venta.numero}`]
+      );
+      // Se permite quedar en negativo (no bloquea la venta).
+      const { rows: urows } = await client.query(
+        "UPDATE insumo SET stock_actual = stock_actual - $1, updated_at = now() WHERE id = $2 RETURNING *",
+        [consumo, insumoId]
+      );
+      const nuevoStock = Number(urows[0].stock_actual);
+      if (nuevoStock <= Number(urows[0].umbral_alerta)) {
+        alertas.push({
+          insumoId,
+          nombre: urows[0].nombre,
+          unidad: urows[0].unidad,
+          stockActual: nuevoStock,
+          negativo: nuevoStock < 0,
+        });
+      }
+    }
+
     await client.query("COMMIT");
-    res.status(201).json({ venta: { ...publicVenta(venta), items: lineas } });
+    res.status(201).json({ venta: { ...publicVenta(venta), items: lineas }, alertas });
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
@@ -151,26 +192,57 @@ const anular = asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const { motivo } = req.body;
 
-  const { rows } = await query(
-    `SELECT v.*, t.estado AS turno_estado
-       FROM venta v JOIN caja_turno t ON t.id = v.caja_turno_id
-      WHERE v.id = $1 AND v.local_id = $2`,
-    [id, localId]
-  );
-  const venta = rows[0];
-  if (!venta) throw new HttpError(404, "Venta no encontrada");
-  if (venta.estado === "anulada") throw new HttpError(400, "La venta ya está anulada");
-  if (venta.turno_estado !== "abierta") {
-    throw new HttpError(400, "Solo se pueden anular ventas de la caja abierta");
-  }
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
 
-  const { rows: upd } = await query(
-    `UPDATE venta
-        SET estado = 'anulada', anulada_en = now(), anulada_por_id = $1, motivo_anulacion = $2
-      WHERE id = $3 RETURNING *`,
-    [req.user.id, motivo || null, id]
-  );
-  res.json({ venta: publicVenta(upd[0]) });
+    const { rows } = await client.query(
+      `SELECT v.*, t.estado AS turno_estado
+         FROM venta v JOIN caja_turno t ON t.id = v.caja_turno_id
+        WHERE v.id = $1 AND v.local_id = $2
+        FOR UPDATE OF v`,
+      [id, localId]
+    );
+    const venta = rows[0];
+    if (!venta) throw new HttpError(404, "Venta no encontrada");
+    if (venta.estado === "anulada") throw new HttpError(400, "La venta ya está anulada");
+    if (venta.turno_estado !== "abierta") {
+      throw new HttpError(400, "Solo se pueden anular ventas de la caja abierta");
+    }
+
+    // Devolver el stock: revertir cada consumo de esta venta.
+    const { rows: consumos } = await client.query(
+      "SELECT insumo_id, cantidad FROM movimiento_inventario WHERE venta_id = $1 AND tipo = 'consumo'",
+      [id]
+    );
+    for (const c of consumos) {
+      const devolucion = -Number(c.cantidad); // cantidad de consumo es negativa -> positiva
+      await client.query(
+        `INSERT INTO movimiento_inventario (local_id, insumo_id, tipo, cantidad, venta_id, usuario_id, motivo)
+         VALUES ($1, $2, 'ajuste', $3, $4, $5, $6)`,
+        [localId, c.insumo_id, devolucion, id, req.user.id, `Devolución por anulación venta #${venta.numero}`]
+      );
+      await client.query(
+        "UPDATE insumo SET stock_actual = stock_actual + $1, updated_at = now() WHERE id = $2",
+        [devolucion, c.insumo_id]
+      );
+    }
+
+    const { rows: upd } = await client.query(
+      `UPDATE venta
+          SET estado = 'anulada', anulada_en = now(), anulada_por_id = $1, motivo_anulacion = $2
+        WHERE id = $3 RETURNING *`,
+      [req.user.id, motivo || null, id]
+    );
+
+    await client.query("COMMIT");
+    res.json({ venta: publicVenta(upd[0]) });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 });
 
 module.exports = { registrar, listar, detalle, anular, registrarSchema, anularSchema };

@@ -61,6 +61,17 @@ export default function Comprobante({ venta, onNueva, onAnular }) {
         </div>
       )}
 
+      {venta.alertas && venta.alertas.length > 0 && !anulada && (
+        <div className="mt-3 rounded-lg bg-frappe-dangerSoft px-3 py-2 text-xs text-frappe-danger">
+          <div className="mb-1 font-semibold">⚠ Stock bajo tras esta venta:</div>
+          {venta.alertas.map((a) => (
+            <div key={a.insumoId}>
+              {a.nombre}: {a.stockActual} {a.unidad}{a.negativo ? " (¡negativo!)" : ""}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="mt-4 flex gap-2">
         <button
           onClick={onNueva}

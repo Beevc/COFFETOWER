@@ -6,6 +6,8 @@ import AdminLayout from "./pages/admin/AdminLayout";
 import UsersPage from "./pages/admin/UsersPage";
 import ProductsPage from "./pages/admin/ProductsPage";
 import VentasPage from "./pages/admin/VentasPage";
+import InsumosPage from "./pages/admin/InsumosPage";
+import RecetasPage from "./pages/admin/RecetasPage";
 import CajeroLayout from "./pages/cajero/CajeroLayout";
 import VenderPage from "./pages/cajero/VenderPage";
 import CajaPage from "./pages/cajero/CajaPage";
@@ -52,6 +54,8 @@ export default function App() {
             <Route index element={<Navigate to="usuarios" replace />} />
             <Route path="usuarios" element={<UsersPage />} />
             <Route path="productos" element={<ProductsPage />} />
+            <Route path="insumos" element={<InsumosPage />} />
+            <Route path="recetas" element={<RecetasPage />} />
             <Route path="ventas" element={<VentasPage />} />
           </Route>
 

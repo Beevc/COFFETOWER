@@ -59,8 +59,8 @@ export default function VenderPage() {
     setPagando(true);
     try {
       const items = cart.map((i) => ({ productoId: i.id, cantidad: i.cantidad }));
-      const venta = await ventasApi.registrar(medioPago, items);
-      setComprobante(venta);
+      const { venta, alertas } = await ventasApi.registrar(medioPago, items);
+      setComprobante({ ...venta, alertas });
       setCart([]);
       refrescar(); // actualiza totales de caja
     } catch (err) {

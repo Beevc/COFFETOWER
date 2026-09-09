@@ -1,8 +1,9 @@
 import api from "./client";
 
 export const ventasApi = {
+  // Devuelve { venta, alertas } (alertas = insumos que quedaron bajo umbral)
   registrar: (medioPago, items) =>
-    api.post("/ventas", { medioPago, items }).then((r) => r.data.venta),
+    api.post("/ventas", { medioPago, items }).then((r) => r.data),
   listar: (turnoId) =>
     api
       .get("/ventas", { params: turnoId ? { turnoId } : {} })

@@ -6,6 +6,8 @@ const usersRoutes = require("./modules/users/users.routes");
 const productsRoutes = require("./modules/products/products.routes");
 const cajaRoutes = require("./modules/caja/caja.routes");
 const ventasRoutes = require("./modules/ventas/ventas.routes");
+const insumosRoutes = require("./modules/insumos/insumos.routes");
+const recetasRoutes = require("./modules/recetas/recetas.routes");
 const { errorHandler, notFound } = require("./middleware/errorHandler");
 
 const app = express();
@@ -25,6 +27,8 @@ app.use("/api/users", usersRoutes);
 app.use("/api/products", productsRoutes);
 app.use("/api/caja", cajaRoutes);
 app.use("/api/ventas", ventasRoutes);
+app.use("/api/insumos", insumosRoutes);
+app.use("/api/recetas", recetasRoutes);
 
 // 404 + manejo de errores (siempre al final).
 app.use(notFound);
