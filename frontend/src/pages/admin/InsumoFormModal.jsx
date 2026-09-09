@@ -6,7 +6,7 @@ import { insumosApi } from "../../api/insumos";
 const inputCls =
   "w-full rounded-lg border border-frappe-border bg-frappe-bg px-3 py-2.5 text-sm text-frappe-text outline-none focus:border-frappe-accent";
 const labelCls = "mb-1 block text-sm text-frappe-textSoft";
-const UNIDADES = ["ml", "l", "g", "kg", "unidad"];
+const UNIDADES = ["ml", "l", "g", "kg", "unidad", "pams"];
 
 export default function InsumoFormModal({ modo, insumo, onClose, onSaved }) {
   const esEditar = modo === "editar";

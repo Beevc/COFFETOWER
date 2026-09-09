@@ -3,7 +3,7 @@ const { pool, query } = require("../../config/db");
 const { HttpError } = require("../../utils/errors");
 const { asyncHandler } = require("../../utils/asyncHandler");
 
-const UNIDADES = ["ml", "l", "g", "kg", "unidad"];
+const UNIDADES = ["ml", "l", "g", "kg", "unidad", "pams"];
 
 const createSchema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio"),
