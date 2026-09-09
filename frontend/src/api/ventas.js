@@ -2,8 +2,9 @@ import api from "./client";
 
 export const ventasApi = {
   // Devuelve { venta, alertas, descuento, beneficio }
-  registrar: (medioPago, items, clienteId) =>
-    api.post("/ventas", { medioPago, items, clienteId }).then((r) => r.data),
+  // extra: { clienteId, momento, horaProgramada }
+  registrar: (medioPago, items, extra = {}) =>
+    api.post("/ventas", { medioPago, items, ...extra }).then((r) => r.data),
   listar: (turnoId) =>
     api
       .get("/ventas", { params: turnoId ? { turnoId } : {} })

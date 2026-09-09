@@ -28,6 +28,9 @@ export default function VenderPage() {
   const [cliQuery, setCliQuery] = useState("");
   const [cliResultados, setCliResultados] = useState([]);
   const [buscandoCli, setBuscandoCli] = useState(false);
+  // Barista: momento de preparación
+  const [momento, setMomento] = useState("al_momento");
+  const [horaProg, setHoraProg] = useState("");
 
   useEffect(() => {
     productsApi
@@ -80,11 +83,15 @@ export default function VenderPage() {
     setPagando(true);
     try {
       const items = cart.map((i) => ({ productoId: i.id, cantidad: i.cantidad }));
-      const { venta, alertas, beneficio } = await ventasApi.registrar(medioPago, items, cliente?.id);
+      const extra = { clienteId: cliente?.id, momento };
+      if (momento === "programado" && horaProg) extra.horaProgramada = horaProg;
+      const { venta, alertas, beneficio } = await ventasApi.registrar(medioPago, items, extra);
       setComprobante({ ...venta, alertas, beneficio });
       setCart([]);
       setCliente(null);
       setCliQuery("");
+      setMomento("al_momento");
+      setHoraProg("");
       refrescar(); // actualiza totales de caja
     } catch (err) {
       setError(err.response?.data?.error || "No se pudo registrar la venta");
@@ -250,6 +257,37 @@ export default function VenderPage() {
             <span>Total</span>
             <span>{money(total)}</span>
           </div>
+
+          {/* Momento de preparación (para el barista) */}
+          <div className="mb-3">
+            <div className="mb-1 text-xs text-frappe-textSoft">Preparación:</div>
+            <div className="flex gap-1 rounded-lg bg-frappe-accentSoft p-1">
+              {[
+                { id: "al_momento", label: "Al momento" },
+                { id: "despues", label: "Después" },
+                { id: "programado", label: "Programar" },
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setMomento(m.id)}
+                  className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${
+                    momento === m.id ? "bg-frappe-surface text-frappe-accentDark shadow-sm" : "text-frappe-textSoft"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            {momento === "programado" && (
+              <input
+                type="time"
+                value={horaProg}
+                onChange={(e) => setHoraProg(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-frappe-border bg-frappe-bg px-3 py-2 text-sm outline-none focus:border-frappe-accent"
+              />
+            )}
+          </div>
+
           <div className="text-xs text-frappe-textSoft">Cobrar con:</div>
           <div className="mt-1.5 grid grid-cols-2 gap-2">
             {MEDIOS.map((m) => (

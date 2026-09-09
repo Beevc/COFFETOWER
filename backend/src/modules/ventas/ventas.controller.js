@@ -11,6 +11,8 @@ const registrarSchema = z.object({
     message: "Medio de pago inválido",
   }),
   clienteId: z.number().int().positive().optional(), // fidelidad (opcional)
+  momento: z.enum(["al_momento", "despues", "programado"]).optional(),
+  horaProgramada: z.string().regex(/^\d{2}:\d{2}$/, "Hora inválida (HH:MM)").optional(),
   items: z
     .array(
       z.object({
@@ -54,7 +56,7 @@ const publicVenta = (v) => ({
 
 // POST /api/ventas
 const registrar = asyncHandler(async (req, res) => {
-  const { medioPago, items, clienteId } = req.body;
+  const { medioPago, items, clienteId, momento = "al_momento", horaProgramada } = req.body;
   const localId = req.user.localId;
 
   const turno = await turnoAbierto(localId);
@@ -213,6 +215,13 @@ const registrar = asyncHandler(async (req, res) => {
         );
       }
     }
+
+    // --- Fase 5: generar pedido para el barista ---
+    await client.query(
+      `INSERT INTO pedido (local_id, venta_id, momento, hora_programada)
+       VALUES ($1, $2, $3, $4)`,
+      [localId, venta.id, momento, momento === "programado" ? horaProgramada || null : null]
+    );
 
     await client.query("COMMIT");
     res.status(201).json({
@@ -405,6 +414,12 @@ const registrarConvenio = asyncHandler(async (req, res) => {
         alertas.push({ insumoId, nombre: urows[0].nombre, unidad: urows[0].unidad, stockActual: nuevoStock, negativo: nuevoStock < 0 });
       }
     }
+
+    // Pedido para el barista (frappé de convenio a preparar).
+    await client.query(
+      "INSERT INTO pedido (local_id, venta_id, momento) VALUES ($1, $2, 'al_momento')",
+      [localId, venta.id]
+    );
 
     await client.query("COMMIT");
     res.status(201).json({ venta: { ...publicVenta(venta), items: lineas }, valorRegalado, alertas });

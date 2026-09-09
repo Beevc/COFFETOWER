@@ -11,6 +11,7 @@ const recetasRoutes = require("./modules/recetas/recetas.routes");
 const estadisticasRoutes = require("./modules/estadisticas/estadisticas.routes");
 const promocionesRoutes = require("./modules/promociones/promociones.routes");
 const fidelidadRoutes = require("./modules/fidelidad/fidelidad.routes");
+const pedidosRoutes = require("./modules/pedidos/pedidos.routes");
 const { errorHandler, notFound } = require("./middleware/errorHandler");
 
 const app = express();
@@ -35,6 +36,7 @@ app.use("/api/recetas", recetasRoutes);
 app.use("/api/estadisticas", estadisticasRoutes);
 app.use("/api/promociones", promocionesRoutes);
 app.use("/api/fidelidad", fidelidadRoutes);
+app.use("/api/pedidos", pedidosRoutes);
 
 // 404 + manejo de errores (siempre al final).
 app.use(notFound);

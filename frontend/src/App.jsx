@@ -15,7 +15,7 @@ import ConvenioPage from "./pages/admin/ConvenioPage";
 import CajeroLayout from "./pages/cajero/CajeroLayout";
 import VenderPage from "./pages/cajero/VenderPage";
 import CajaPage from "./pages/cajero/CajaPage";
-import RolePlaceholder from "./pages/RolePlaceholder";
+import BaristaPage from "./pages/barista/BaristaPage";
 
 const HOME_POR_ROL = {
   admin: "/admin",
@@ -81,15 +81,12 @@ export default function App() {
             <Route path="caja" element={<CajaPage />} />
           </Route>
 
-          {/* Barista (panel de pedidos llega en Fase 5) */}
+          {/* Barista: panel de pedidos */}
           <Route
             path="/barista"
             element={
               <ProtectedRoute roles={["barista"]}>
-                <RolePlaceholder
-                  titulo="Pedidos"
-                  descripcion="Aquí verás los pedidos pendientes y su estado. Se construye en la Fase 5."
-                />
+                <BaristaPage />
               </ProtectedRoute>
             }
           />
