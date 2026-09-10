@@ -16,6 +16,7 @@ import ConvenioPage from "./pages/admin/ConvenioPage";
 import CajeroLayout from "./pages/cajero/CajeroLayout";
 import VenderPage from "./pages/cajero/VenderPage";
 import PedidosCajaPage from "./pages/cajero/PedidosCajaPage";
+import ClientesCajaPage from "./pages/cajero/ClientesCajaPage";
 import CajaPage from "./pages/cajero/CajaPage";
 import BaristaPage from "./pages/barista/BaristaPage";
 
@@ -82,6 +83,7 @@ export default function App() {
             <Route index element={<Navigate to="vender" replace />} />
             <Route path="vender" element={<VenderPage />} />
             <Route path="pedidos" element={<PedidosCajaPage />} />
+            <Route path="clientes" element={<ClientesCajaPage />} />
             <Route path="caja" element={<CajaPage />} />
           </Route>
 

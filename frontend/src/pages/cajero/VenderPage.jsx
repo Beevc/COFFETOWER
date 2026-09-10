@@ -233,8 +233,8 @@ export default function VenderPage() {
                   placeholder="Cliente fidelidad (opcional)"
                   className="w-full rounded-lg border border-frappe-border bg-frappe-bg py-2 pl-9 pr-3 text-sm outline-none focus:border-frappe-accent"
                 />
-                {cliQuery.trim().length >= 2 && (
-                  <div className="absolute z-10 mt-1 max-h-44 w-full overflow-auto rounded-lg border border-frappe-border bg-frappe-surface shadow-lg">
+                {cliQuery.trim().length >= 2 && !creandoCli && (
+                  <div className="absolute z-10 mt-1 max-h-52 w-full overflow-auto rounded-lg border border-frappe-border bg-frappe-surface shadow-lg">
                     {buscandoCli ? (
                       <div className="px-3 py-2 text-xs text-frappe-textSoft">Buscando…</div>
                     ) : cliResultados.length === 0 ? (
@@ -253,6 +253,13 @@ export default function VenderPage() {
                         </button>
                       ))
                     )}
+                    {/* Crear el cliente escrito, siempre visible dentro de la lista */}
+                    <button
+                      onMouseDown={(e) => { e.preventDefault(); setCreandoCli(true); setNuevoNombre(cliQuery.trim()); }}
+                      className="flex w-full items-center gap-1.5 border-t border-frappe-border bg-frappe-accentSoft px-3 py-2 text-left text-sm font-semibold text-frappe-accentDark hover:bg-frappe-accent hover:text-white"
+                    >
+                      <UserPlus size={14} /> Crear nuevo cliente{cliQuery.trim() ? ` "${cliQuery.trim()}"` : ""}
+                    </button>
                   </div>
                 )}
               </div>
