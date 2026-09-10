@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
-import { Coffee, LogOut, Check, Loader2, Clock, Zap, Timer, RefreshCw, Gift } from "lucide-react";
+import { Coffee, LogOut, Check, Loader2, Clock, Zap, Timer, RefreshCw, Gift, Play, BookOpen, ChevronDown } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { pedidosApi } from "../../api/pedidos";
+import { recetasApi } from "../../api/recetas";
+import { estadoInfo } from "../../components/pedidoEstado";
 
 const MOMENTO = {
   al_momento: { label: "Al momento", icon: Zap, cls: "bg-frappe-successSoft text-frappe-success" },
@@ -20,34 +22,158 @@ function MomentoBadge({ momento, hora }) {
   );
 }
 
+function EstadoBadge({ estado }) {
+  const e = estadoInfo(estado);
+  return <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${e.cls}`}>{e.label}</span>;
+}
+
+// Muestra la receta de un producto (se carga al abrir, se cachea entre aperturas).
+function VerReceta({ productoId }) {
+  const [abierto, setAbierto] = useState(false);
+  const [receta, setReceta] = useState(null);
+  const [cargando, setCargando] = useState(false);
+
+  const toggle = async () => {
+    const nuevo = !abierto;
+    setAbierto(nuevo);
+    if (nuevo && !receta && productoId) {
+      setCargando(true);
+      try {
+        const data = await recetasApi.get(productoId);
+        setReceta(data.items || []);
+      } catch {
+        setReceta([]);
+      } finally {
+        setCargando(false);
+      }
+    }
+  };
+
+  if (!productoId) return null;
+
+  return (
+    <div>
+      <button onClick={toggle} className="mt-0.5 flex items-center gap-1 text-xs font-medium text-frappe-accentDark">
+        <BookOpen size={11} /> Receta <ChevronDown size={11} className={`transition ${abierto ? "rotate-180" : ""}`} />
+      </button>
+      {abierto && (
+        <div className="mt-1 rounded-lg bg-frappe-bg px-3 py-2 text-xs">
+          {cargando ? (
+            <span className="text-frappe-textSoft">Cargando…</span>
+          ) : receta && receta.length > 0 ? (
+            receta.map((r) => (
+              <div key={r.insumoId} className="flex justify-between py-0.5 text-frappe-text">
+                <span>{r.nombre}</span>
+                <span className="font-semibold">{r.cantidad} {r.unidadReceta || r.unidad}</span>
+              </div>
+            ))
+          ) : (
+            <span className="text-frappe-textSoft">Sin receta definida.</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BaristaPage() {
   const { usuario, logout } = useAuth();
-  const [pendientes, setPendientes] = useState([]);
+  const [activos, setActivos] = useState([]);
   const [hoy, setHoy] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [preparandoId, setPreparandoId] = useState(null);
+  const [accionId, setAccionId] = useState(null);
 
   const cargar = useCallback(async () => {
-    const [p, h] = await Promise.all([pedidosApi.pendientes(), pedidosApi.preparadosHoy()]);
-    setPendientes(p);
+    const [a, h] = await Promise.all([pedidosApi.activos(), pedidosApi.entregadosHoy()]);
+    setActivos(a);
     setHoy(h);
   }, []);
 
   useEffect(() => {
     cargar().finally(() => setCargando(false));
-    const t = setInterval(cargar, 15000); // auto-refresh
+    const t = setInterval(cargar, 15000);
     return () => clearInterval(t);
   }, [cargar]);
 
-  const marcar = async (id) => {
-    setPreparandoId(id);
+  const avanzar = async (id, estado) => {
+    setAccionId(id);
     try {
-      await pedidosApi.preparar(id);
+      await pedidosApi.cambiarEstado(id, estado);
       await cargar();
     } finally {
-      setPreparandoId(null);
+      setAccionId(null);
     }
   };
+
+  // Solo interesan al barista los que aún no están entregados; los agrupamos por estado.
+  const norm = (e) => (e === "preparado" ? "listo" : e);
+  const enEspera = activos.filter((p) => norm(p.estado) === "pendiente");
+  const enPrep = activos.filter((p) => norm(p.estado) === "en_preparacion");
+  const listos = activos.filter((p) => norm(p.estado) === "listo");
+
+  const Tarjeta = ({ p }) => {
+    const estado = norm(p.estado);
+    return (
+      <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <span className="font-mono text-sm text-frappe-textSoft">#{p.ventaNumero}</span>
+          {p.nombreCliente && (
+            <span className="rounded-full bg-frappe-accent px-2.5 py-0.5 text-xs font-bold text-white">{p.nombreCliente}</span>
+          )}
+          <MomentoBadge momento={p.momento} hora={p.horaProgramada} />
+          <EstadoBadge estado={estado} />
+          {p.esConvenio && (
+            <span className="flex items-center gap-1 rounded-full bg-frappe-accentSoft px-2 py-0.5 text-xs font-semibold text-frappe-accentDark">
+              <Gift size={10} /> convenio
+            </span>
+          )}
+        </div>
+        <div className="mb-3 space-y-1">
+          {p.items.map((it, i) => (
+            <div key={i}>
+              <div className="text-sm text-frappe-text">
+                <span className="font-bold text-frappe-accentDark">{it.cantidad}×</span> {it.nombre}
+              </div>
+              <VerReceta productoId={it.productoId} />
+            </div>
+          ))}
+        </div>
+        {estado === "pendiente" && (
+          <button onClick={() => avanzar(p.id, "en_preparacion")} disabled={accionId === p.id}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-frappe-accent py-2.5 text-sm font-semibold text-white transition hover:bg-frappe-accentDark disabled:opacity-60">
+            {accionId === p.id ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />} Empezar
+          </button>
+        )}
+        {estado === "en_preparacion" && (
+          <button onClick={() => avanzar(p.id, "listo")} disabled={accionId === p.id}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-frappe-success py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60">
+            {accionId === p.id ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Marcar listo
+          </button>
+        )}
+        {estado === "listo" && (
+          <div className="rounded-lg bg-frappe-successSoft py-2 text-center text-sm font-semibold text-frappe-success">
+            Listo — esperando entrega en caja
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const Seccion = ({ titulo, lista, color }) => (
+    <>
+      <div className="mb-3 mt-6 flex items-center justify-between first:mt-0">
+        <h2 className="font-serif text-lg font-semibold text-frappe-text">{titulo}</h2>
+        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${color}`}>{lista.length}</span>
+      </div>
+      {lista.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-frappe-border bg-frappe-surface py-6 text-center text-xs text-frappe-textSoft">
+          Nada aquí.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">{lista.map((p) => <Tarjeta key={p.id} p={p} />)}</div>
+      )}
+    </>
+  );
 
   return (
     <div className="min-h-full bg-frappe-bg">
@@ -78,63 +204,24 @@ export default function BaristaPage() {
           </div>
         ) : (
           <>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-serif text-lg font-semibold text-frappe-text">Por preparar</h2>
-              <span className="rounded-full bg-frappe-accent px-2.5 py-0.5 text-xs font-semibold text-white">{pendientes.length}</span>
-            </div>
-
-            {pendientes.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-frappe-border bg-frappe-surface py-14 text-center text-sm text-frappe-textSoft">
-                No hay pedidos pendientes. 🎉
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {pendientes.map((p) => (
-                  <div key={p.id} className="rounded-2xl border border-frappe-border bg-frappe-surface p-4">
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm text-frappe-textSoft">#{p.ventaNumero}</span>
-                        <MomentoBadge momento={p.momento} hora={p.horaProgramada} />
-                        {p.esConvenio && (
-                          <span className="flex items-center gap-1 rounded-full bg-frappe-accentSoft px-2 py-0.5 text-xs font-semibold text-frappe-accentDark">
-                            <Gift size={10} /> convenio
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mb-3">
-                      {p.items.map((it, i) => (
-                        <div key={i} className="text-sm text-frappe-text">
-                          <span className="font-bold text-frappe-accentDark">{it.cantidad}×</span> {it.nombre}
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => marcar(p.id)}
-                      disabled={preparandoId === p.id}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-frappe-success py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-                    >
-                      {preparandoId === p.id ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                      Marcar preparado
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+            <Seccion titulo="En espera" lista={enEspera} color="bg-frappe-danger text-white" />
+            <Seccion titulo="En preparación" lista={enPrep} color="bg-frappe-accent text-white" />
+            <Seccion titulo="Listos (por entregar)" lista={listos} color="bg-frappe-success text-white" />
 
             {hoy.length > 0 && (
               <>
-                <h2 className="mb-3 mt-8 font-serif text-lg font-semibold text-frappe-text">Preparados hoy</h2>
+                <h2 className="mb-3 mt-8 font-serif text-lg font-semibold text-frappe-text">Entregados hoy</h2>
                 <div className="overflow-hidden rounded-xl border border-frappe-border bg-frappe-surface">
                   {hoy.map((p, i) => (
                     <div key={p.id} className={`flex items-center gap-3 px-4 py-2.5 text-sm ${i > 0 ? "border-t border-frappe-border" : ""}`}>
                       <Check size={14} className="text-frappe-success" />
                       <span className="font-mono text-frappe-textSoft">#{p.ventaNumero}</span>
+                      {p.nombreCliente && <span className="font-semibold text-frappe-text">{p.nombreCliente}</span>}
                       <span className="flex-1 truncate text-frappe-textSoft">
                         {p.items.map((it) => `${it.cantidad}× ${it.nombre}`).join(", ")}
                       </span>
                       <span className="text-xs text-frappe-textSoft">
-                        {p.preparadoEn ? new Date(p.preparadoEn).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : ""}
+                        {p.entregadoEn ? new Date(p.entregadoEn).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : ""}
                       </span>
                     </div>
                   ))}

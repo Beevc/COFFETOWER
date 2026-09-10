@@ -1,13 +1,15 @@
 const { Router } = require("express");
-const { pendientes, preparadosHoy, preparar } = require("./pedidos.controller");
+const { activos, entregadosHoy, cambiarEstado, cambiarEstadoSchema } = require("./pedidos.controller");
+const { validateBody } = require("../../middleware/validate");
 const { authenticate, requireRole } = require("../../middleware/auth");
 
 const router = Router();
 router.use(authenticate);
 
-// El barista (y el admin) ven y preparan pedidos.
-router.get("/pendientes", requireRole("barista", "admin"), pendientes);
-router.get("/preparados-hoy", requireRole("barista", "admin"), preparadosHoy);
-router.post("/:id/preparar", requireRole("barista", "admin"), preparar);
+// Ver pedidos: barista, cajero y admin (el barista prepara, la caja entrega y ve estado).
+router.get("/activos", requireRole("barista", "cajero", "admin"), activos);
+router.get("/entregados-hoy", requireRole("barista", "cajero", "admin"), entregadosHoy);
+// Cambiar estado: el controller valida el paso y el rol exacto (barista prepara, caja entrega).
+router.post("/:id/estado", requireRole("barista", "cajero", "admin"), validateBody(cambiarEstadoSchema), cambiarEstado);
 
 module.exports = router;

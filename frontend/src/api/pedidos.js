@@ -1,7 +1,10 @@
 import api from "./client";
 
 export const pedidosApi = {
-  pendientes: () => api.get("/pedidos/pendientes").then((r) => r.data.pedidos),
-  preparadosHoy: () => api.get("/pedidos/preparados-hoy").then((r) => r.data.pedidos),
-  preparar: (id) => api.post(`/pedidos/${id}/preparar`).then((r) => r.data),
+  // Pedidos no entregados (en espera / en preparación / listos).
+  activos: () => api.get("/pedidos/activos").then((r) => r.data.pedidos),
+  entregadosHoy: () => api.get("/pedidos/entregados-hoy").then((r) => r.data.pedidos),
+  // estado: "en_preparacion" | "listo" | "entregado"
+  cambiarEstado: (id, estado) =>
+    api.post(`/pedidos/${id}/estado`, { estado }).then((r) => r.data.pedido),
 };
