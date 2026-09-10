@@ -11,6 +11,7 @@ const registrarSchema = z.object({
     message: "Medio de pago inválido",
   }),
   clienteId: z.number().int().positive().optional(), // fidelidad (opcional)
+  nombreCliente: z.string().trim().max(60).optional(), // nombre para llamar el pedido
   momento: z.enum(["al_momento", "despues", "programado"]).optional(),
   horaProgramada: z.string().regex(/^\d{2}:\d{2}$/, "Hora inválida (HH:MM)").optional(),
   items: z
@@ -56,7 +57,7 @@ const publicVenta = (v) => ({
 
 // POST /api/ventas
 const registrar = asyncHandler(async (req, res) => {
-  const { medioPago, items, clienteId, momento = "al_momento", horaProgramada } = req.body;
+  const { medioPago, items, clienteId, nombreCliente, momento = "al_momento", horaProgramada } = req.body;
   const localId = req.user.localId;
 
   const turno = await turnoAbierto(localId);
@@ -221,10 +222,12 @@ const registrar = asyncHandler(async (req, res) => {
     }
 
     // --- Fase 5: generar pedido para el barista ---
+    // Nombre para llamar el pedido: el escrito en caja, o el del cliente de fidelidad.
+    const nombrePedido = (nombreCliente && nombreCliente.trim()) || cliente?.nombre || null;
     await client.query(
-      `INSERT INTO pedido (local_id, venta_id, momento, hora_programada)
-       VALUES ($1, $2, $3, $4)`,
-      [localId, venta.id, momento, momento === "programado" ? horaProgramada || null : null]
+      `INSERT INTO pedido (local_id, venta_id, momento, hora_programada, nombre_cliente)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [localId, venta.id, momento, momento === "programado" ? horaProgramada || null : null, nombrePedido]
     );
 
     await client.query("COMMIT");

@@ -27,7 +27,8 @@ const updateSchema = z
 const SELECT_PRODUCTO = `
   SELECT p.id, p.local_id, p.sku, p.nombre, p.precio, p.activo, p.created_at,
          p.categoria_id,
-         cc.nivel AS cat_nivel, cc.nombre AS cat_n1, cp.nombre AS cat_n2, cpp.nombre AS cat_n3
+         cc.nivel AS cat_nivel, cc.nombre AS cat_n1, cp.nombre AS cat_n2, cpp.nombre AS cat_n3,
+         EXISTS (SELECT 1 FROM receta_item ri WHERE ri.producto_id = p.id) AS tiene_receta
     FROM producto p
     LEFT JOIN categoria_producto cc  ON cc.id = p.categoria_id
     LEFT JOIN categoria_producto cp  ON cp.id = cc.parent_id
@@ -54,6 +55,7 @@ const publicProduct = (p) => ({
   precio: p.precio,
   categoriaId: p.categoria_id,
   ...categoriaCampos(p),
+  tieneReceta: p.tiene_receta,
   activo: p.activo,
   localId: p.local_id,
   createdAt: p.created_at,

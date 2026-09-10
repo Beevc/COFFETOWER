@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Coffee, LogOut, Receipt, Wallet, Lock, Unlock } from "lucide-react";
+import { Coffee, LogOut, Receipt, Wallet, Lock, Unlock, CupSoda } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { CajaProvider, useCaja } from "./CajaContext";
 
 const navItems = [
   { to: "/cajero/vender", label: "Vender", icon: Receipt },
+  { to: "/cajero/pedidos", label: "Pedidos", icon: CupSoda },
   { to: "/cajero/caja", label: "Caja", icon: Wallet },
 ];
 

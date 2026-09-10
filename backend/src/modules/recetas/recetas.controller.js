@@ -29,7 +29,7 @@ const getReceta = asyncHandler(async (req, res) => {
   if (!producto) throw new HttpError(404, "Producto no encontrado");
 
   const { rows } = await query(
-    `SELECT r.insumo_id AS "insumoId", i.nombre, i.unidad, r.cantidad
+    `SELECT r.insumo_id AS "insumoId", i.nombre, i.unidad, i.unidad_receta, r.cantidad
        FROM receta_item r
        JOIN insumo i ON i.id = r.insumo_id
       WHERE r.producto_id = $1
@@ -42,6 +42,7 @@ const getReceta = asyncHandler(async (req, res) => {
       insumoId: r.insumoId,
       nombre: r.nombre,
       unidad: r.unidad,
+      unidadReceta: r.unidad_receta || null,
       cantidad: Number(r.cantidad),
     })),
   });

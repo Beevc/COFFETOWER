@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Loader2, Save, Check } from "lucide-react";
+import { Plus, Trash2, Loader2, Save, Check, AlertTriangle } from "lucide-react";
 import { productsApi } from "../../api/products";
 import { insumosApi } from "../../api/insumos";
 import { recetasApi } from "../../api/recetas";
@@ -18,6 +18,9 @@ export default function RecetasPage() {
   const [guardado, setGuardado] = useState(false);
   const [error, setError] = useState("");
 
+  const cargarProductos = () =>
+    productsApi.list({ activo: true }).then(setProductos).catch(() => {});
+
   useEffect(() => {
     Promise.all([productsApi.list({ activo: true }), insumosApi.list({ activo: true })])
       .then(([p, i]) => {
@@ -27,6 +30,9 @@ export default function RecetasPage() {
       .catch(() => setError("No se pudieron cargar los datos"))
       .finally(() => setCargando(false));
   }, []);
+
+  const conReceta = productos.filter((p) => p.tieneReceta);
+  const sinReceta = productos.filter((p) => !p.tieneReceta);
 
   const cargarReceta = async (id) => {
     setProdId(id);
@@ -85,6 +91,7 @@ export default function RecetasPage() {
     try {
       await recetasApi.set(Number(prodId), limpios);
       setGuardado(true);
+      cargarProductos(); // refresca los indicadores ✓ / ⚠
     } catch (err) {
       setError(err.response?.data?.error || "No se pudo guardar la receta");
     } finally {
@@ -117,15 +124,48 @@ export default function RecetasPage() {
         <>
           <label className="mb-1 block text-sm text-frappe-textSoft">Producto</label>
           <select
-            className={`${inputCls} mb-4 w-full`}
+            className={`${inputCls} mb-2 w-full`}
             value={prodId}
             onChange={(e) => cargarReceta(e.target.value)}
           >
             <option value="">— Elige un producto —</option>
-            {productos.map((p) => (
-              <option key={p.id} value={p.id}>{p.nombre}</option>
-            ))}
+            {conReceta.length > 0 && (
+              <optgroup label="✓ Con receta">
+                {conReceta.map((p) => (
+                  <option key={p.id} value={p.id}>✓ {p.nombre}</option>
+                ))}
+              </optgroup>
+            )}
+            {sinReceta.length > 0 && (
+              <optgroup label="⚠ Sin receta">
+                {sinReceta.map((p) => (
+                  <option key={p.id} value={p.id}>⚠ {p.nombre}</option>
+                ))}
+              </optgroup>
+            )}
           </select>
+
+          {/* Resumen: cuántos tienen receta y cuáles faltan */}
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+            <span className="flex items-center gap-1 rounded-full bg-frappe-successSoft px-2 py-0.5 font-semibold text-frappe-success">
+              <Check size={11} /> {conReceta.length} con receta
+            </span>
+            {sinReceta.length > 0 && (
+              <span className="flex items-center gap-1 rounded-full bg-frappe-dangerSoft px-2 py-0.5 font-semibold text-frappe-danger">
+                <AlertTriangle size={11} /> {sinReceta.length} sin receta
+              </span>
+            )}
+          </div>
+          {sinReceta.length > 0 && (
+            <div className="mb-4 rounded-lg border border-frappe-border bg-frappe-bg px-3 py-2 text-xs text-frappe-textSoft">
+              <span className="font-semibold text-frappe-text">Faltan receta:</span>{" "}
+              {sinReceta.map((p, idx) => (
+                <button key={p.id} onClick={() => cargarReceta(String(p.id))} className="text-frappe-accentDark hover:underline">
+                  {p.nombre}{idx < sinReceta.length - 1 ? ", " : ""}
+                </button>
+              ))}
+            </div>
+          )}
 
           {error && (
             <div className="mb-3 rounded-lg bg-frappe-dangerSoft px-3 py-2 text-sm font-medium text-frappe-danger">
