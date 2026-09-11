@@ -3,14 +3,15 @@ import { X } from "lucide-react";
 export default function Modal({ title, onClose, children }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 sm:items-center"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-frappe-border bg-frappe-surface p-6 shadow-xl"
+        className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-frappe-border bg-frappe-surface shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex items-center justify-between">
+        {/* Encabezado fijo */}
+        <div className="flex shrink-0 items-center justify-between border-b border-frappe-border px-6 py-4">
           <h2 className="font-serif text-lg font-semibold text-frappe-text">{title}</h2>
           <button
             onClick={onClose}
@@ -19,7 +20,10 @@ export default function Modal({ title, onClose, children }) {
             <X size={18} />
           </button>
         </div>
-        {children}
+        {/* Cuerpo desplazable */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 [-webkit-overflow-scrolling:touch]">
+          {children}
+        </div>
       </div>
     </div>
   );
