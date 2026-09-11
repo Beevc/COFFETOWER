@@ -1,9 +1,10 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Coffee, LogOut, Users, Package, Wallet, Boxes, BookOpen, BarChart3, Tag, Star, Gift, Layers } from "lucide-react";
+import { Coffee, LogOut, Users, Package, Wallet, Boxes, BookOpen, BarChart3, Tag, Star, Gift, Layers, Landmark } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 
 const navItems = [
   { to: "/admin/estadisticas", label: "Estadísticas", icon: BarChart3 },
+  { to: "/admin/finanzas", label: "Finanzas", icon: Landmark },
   { to: "/admin/ventas", label: "Ventas", icon: Wallet },
   { to: "/admin/productos", label: "Productos", icon: Package },
   { to: "/admin/categorias", label: "Categorías", icon: Layers },
