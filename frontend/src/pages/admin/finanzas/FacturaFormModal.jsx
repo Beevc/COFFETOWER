@@ -118,16 +118,14 @@ export default function FacturaFormModal({ proveedores, onClose, onSaved }) {
           ) : null}
         </div>
 
-        {/* Fechas */}
-        <div className="mb-3 grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelCls}>Fecha de emisión</label>
-            <input type="date" className={inputCls} value={fechaEmision} onChange={(e) => setFechaEmision(e.target.value)} required />
-          </div>
-          <div>
-            <label className={labelCls}>Vencimiento (opcional)</label>
-            <input type="date" className={inputCls} value={fechaVencimiento} onChange={(e) => setFechaVencimiento(e.target.value)} />
-          </div>
+        {/* Fechas: apiladas para que no se encimen en pantallas angostas */}
+        <div className="mb-3">
+          <label className={labelCls}>Fecha de emisión</label>
+          <input type="date" className={`${inputCls} block min-w-0 appearance-none`} value={fechaEmision} onChange={(e) => setFechaEmision(e.target.value)} required />
+        </div>
+        <div className="mb-3">
+          <label className={labelCls}>Vencimiento (opcional)</label>
+          <input type="date" className={`${inputCls} block min-w-0 appearance-none`} value={fechaVencimiento} onChange={(e) => setFechaVencimiento(e.target.value)} />
         </div>
 
         {/* Datos opcionales */}
