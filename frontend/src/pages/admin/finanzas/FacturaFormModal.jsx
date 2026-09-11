@@ -126,20 +126,35 @@ export default function FacturaFormModal({ proveedores, onClose, onSaved }) {
         <div className="mb-3 rounded-lg border border-frappe-border bg-frappe-bg/50 p-3">
           <div className="mb-1 text-sm font-semibold text-frappe-text">Insumos comprados (opcional)</div>
           <p className="mb-2 text-xs text-frappe-textSoft">Los que agregues aquí <b>suman stock</b> al inventario automáticamente.</p>
-          {items.map((it, idx) => (
-            <div key={idx} className="mb-2 flex items-center gap-2">
-              <select className={`${inputCls} flex-1`} value={it.insumoId} onChange={(e) => setItem(idx, "insumoId", e.target.value)}>
-                <option value="">— insumo —</option>
-                {insumos.map((i) => <option key={i.id} value={i.id}>{i.nombre}</option>)}
-              </select>
-              <input type="number" step="any" min="0" className={`${inputCls} w-24`} value={it.cantidad} onChange={(e) => setItem(idx, "cantidad", e.target.value)} placeholder="cant." />
-              <span className="w-8 text-xs text-frappe-textSoft">{unidadDe(it.insumoId)}</span>
-              <button type="button" onClick={() => removeItem(idx)} className="rounded-lg p-2 text-frappe-textSoft hover:bg-frappe-bg hover:text-frappe-danger"><Trash2 size={15} /></button>
-            </div>
-          ))}
-          <button type="button" onClick={addItem} className="flex items-center gap-1.5 rounded-lg border border-dashed border-frappe-border px-3 py-1.5 text-xs font-medium text-frappe-textSoft hover:border-frappe-accent hover:text-frappe-accentDark">
-            <Plus size={14} /> Agregar insumo
-          </button>
+
+          {insumos.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-frappe-border bg-frappe-surface px-3 py-2 text-xs text-frappe-textSoft">
+              No hay insumos creados. Créalos en la pestaña <b>Insumos</b> para poder cargarlos aquí.
+            </p>
+          ) : (
+            <>
+              {items.map((it, idx) => (
+                <div key={idx} className="mb-2 rounded-lg border border-frappe-border bg-frappe-surface p-2.5">
+                  <label className="mb-1 block text-xs text-frappe-textSoft">Insumo</label>
+                  <select className={`${inputCls} mb-2`} value={it.insumoId} onChange={(e) => setItem(idx, "insumoId", e.target.value)}>
+                    <option value="">— Elegir insumo —</option>
+                    {insumos.map((i) => <option key={i.id} value={i.id}>{i.nombre} ({i.unidad})</option>)}
+                  </select>
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <label className="mb-1 block text-xs text-frappe-textSoft">Cantidad</label>
+                      <input type="number" step="any" min="0" className={inputCls} value={it.cantidad} onChange={(e) => setItem(idx, "cantidad", e.target.value)} placeholder="0" />
+                    </div>
+                    <span className="pb-2.5 text-sm font-medium text-frappe-textSoft">{unidadDe(it.insumoId) || ""}</span>
+                    <button type="button" onClick={() => removeItem(idx)} className="rounded-lg border border-frappe-border p-2.5 text-frappe-textSoft hover:bg-frappe-bg hover:text-frappe-danger"><Trash2 size={16} /></button>
+                  </div>
+                </div>
+              ))}
+              <button type="button" onClick={addItem} className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-frappe-border px-3 py-2 text-sm font-medium text-frappe-textSoft hover:border-frappe-accent hover:text-frappe-accentDark">
+                <Plus size={15} /> Agregar insumo
+              </button>
+            </>
+          )}
         </div>
 
         {/* Pago inicial */}
