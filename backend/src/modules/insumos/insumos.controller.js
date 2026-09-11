@@ -16,6 +16,7 @@ const createSchema = z.object({
   unidad: z.enum(UNIDADES, { message: "Unidad inválida" }),
   stockInicial: z.number().min(0, "No puede ser negativo").optional(),
   umbralAlerta: z.number().min(0, "No puede ser negativo").optional(),
+  costoUnitario: z.number().min(0, "No puede ser negativo").optional(),
   ...recetaFields,
 });
 
@@ -24,6 +25,7 @@ const updateSchema = z
     nombre: z.string().trim().min(1).optional(),
     unidad: z.enum(UNIDADES, { message: "Unidad inválida" }).optional(),
     umbralAlerta: z.number().min(0).optional(),
+    costoUnitario: z.number().min(0).optional(),
     activo: z.boolean().optional(),
     ...recetaFields,
   })
@@ -46,6 +48,7 @@ const publicInsumo = (i) => ({
   unidad: i.unidad,
   unidadReceta: i.unidad_receta || null,
   factorReceta: Number(i.factor_receta),
+  costoUnitario: Number(i.costo_unitario),
   stockActual: Number(i.stock_actual),
   umbralAlerta: Number(i.umbral_alerta),
   activo: i.activo,
@@ -85,7 +88,7 @@ const list = asyncHandler(async (req, res) => {
 
 // POST /api/insumos  (crea insumo; si trae stockInicial, registra un ingreso)
 const create = asyncHandler(async (req, res) => {
-  const { nombre, unidad, stockInicial = 0, umbralAlerta = 0, unidadReceta, factorReceta } = req.body;
+  const { nombre, unidad, stockInicial = 0, umbralAlerta = 0, costoUnitario = 0, unidadReceta, factorReceta } = req.body;
   const localId = req.user.localId;
   const { ur, fr } = normalizarReceta(unidadReceta, factorReceta);
   const client = await pool.connect();
@@ -94,9 +97,9 @@ const create = asyncHandler(async (req, res) => {
     let insumo;
     try {
       const { rows } = await client.query(
-        `INSERT INTO insumo (local_id, nombre, unidad, stock_actual, umbral_alerta, unidad_receta, factor_receta)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [localId, nombre, unidad, stockInicial, umbralAlerta, ur, fr]
+        `INSERT INTO insumo (local_id, nombre, unidad, stock_actual, umbral_alerta, unidad_receta, factor_receta, costo_unitario)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [localId, nombre, unidad, stockInicial, umbralAlerta, ur, fr, costoUnitario]
       );
       insumo = rows[0];
     } catch (err) {
@@ -127,13 +130,14 @@ const update = asyncHandler(async (req, res) => {
   const actual = await getInsumoDelLocal(id, localId);
   if (!actual) throw new HttpError(404, "Insumo no encontrado");
 
-  const { nombre, unidad, umbralAlerta, activo, unidadReceta, factorReceta } = req.body;
+  const { nombre, unidad, umbralAlerta, costoUnitario, activo, unidadReceta, factorReceta } = req.body;
   const sets = [];
   const values = [];
   let i = 1;
   if (nombre !== undefined) { sets.push(`nombre = $${i++}`); values.push(nombre); }
   if (unidad !== undefined) { sets.push(`unidad = $${i++}`); values.push(unidad); }
   if (umbralAlerta !== undefined) { sets.push(`umbral_alerta = $${i++}`); values.push(umbralAlerta); }
+  if (costoUnitario !== undefined) { sets.push(`costo_unitario = $${i++}`); values.push(costoUnitario); }
   if (activo !== undefined) { sets.push(`activo = $${i++}`); values.push(activo); }
   // Unidad de receta: si se envía, se normaliza (sin unidad => factor 1).
   if (unidadReceta !== undefined || factorReceta !== undefined) {

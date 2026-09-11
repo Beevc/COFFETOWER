@@ -2,6 +2,7 @@ const { Router } = require("express");
 const proveedores = require("./proveedores.controller");
 const facturas = require("./facturas.controller");
 const { resumen } = require("./resumen.controller");
+const { costos } = require("./costos.controller");
 const { validateBody } = require("../../middleware/validate");
 const { authenticate, requireRole } = require("../../middleware/auth");
 
@@ -12,6 +13,8 @@ router.use(authenticate, requireRole("admin"));
 
 // Resumen (dashboard).
 router.get("/resumen", resumen);
+// Costos y márgenes por producto.
+router.get("/costos", costos);
 
 // Proveedores.
 router.get("/proveedores", proveedores.list);

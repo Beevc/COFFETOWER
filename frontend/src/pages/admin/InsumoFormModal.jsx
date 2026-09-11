@@ -21,6 +21,10 @@ export default function InsumoFormModal({ modo, insumo, onClose, onSaved }) {
   const [factorReceta, setFactorReceta] = useState(
     insumo?.factorReceta != null && insumo?.unidadReceta ? String(insumo.factorReceta) : ""
   );
+  // Costo por unidad real (para calcular el costo de las recetas).
+  const [costoUnitario, setCostoUnitario] = useState(
+    insumo?.costoUnitario ? String(insumo.costoUnitario) : ""
+  );
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
 
@@ -35,11 +39,13 @@ export default function InsumoFormModal({ modo, insumo, onClose, onSaved }) {
         factorReceta: ur ? Number(factorReceta) || 1 : 1,
       };
       let guardado;
+      const costo = Number(costoUnitario) || 0;
       if (esEditar) {
         guardado = await insumosApi.update(insumo.id, {
           nombre: nombre.trim(),
           unidad,
           umbralAlerta: Number(umbralAlerta) || 0,
+          costoUnitario: costo,
           ...receta,
         });
       } else {
@@ -48,6 +54,7 @@ export default function InsumoFormModal({ modo, insumo, onClose, onSaved }) {
           unidad,
           stockInicial: Number(stockInicial) || 0,
           umbralAlerta: Number(umbralAlerta) || 0,
+          costoUnitario: costo,
           ...receta,
         });
       }
@@ -88,6 +95,11 @@ export default function InsumoFormModal({ modo, insumo, onClose, onSaved }) {
           <div className={esEditar ? "" : "col-span-2"}>
             <label className={labelCls}>Umbral de alerta (avisa si baja de esto)</label>
             <input type="number" step="any" min="0" className={inputCls} value={umbralAlerta} onChange={(e) => setUmbralAlerta(e.target.value)} placeholder="0" />
+          </div>
+          <div className="col-span-2">
+            <label className={labelCls}>Costo por {unidad} (CLP, opcional)</label>
+            <input type="number" step="any" min="0" className={inputCls} value={costoUnitario} onChange={(e) => setCostoUnitario(e.target.value)} placeholder={`Ej. cuánto te cuesta 1 ${unidad}`} />
+            <p className="mt-1 text-xs text-frappe-textSoft">Sirve para calcular el costo de las recetas y la ganancia por frappé.</p>
           </div>
         </div>
 

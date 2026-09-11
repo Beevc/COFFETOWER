@@ -5,10 +5,12 @@ import { money } from "../../utils/format";
 import { catLabel } from "./finanzas/constants";
 import FacturasView from "./finanzas/FacturasView";
 import ProveedoresView from "./finanzas/ProveedoresView";
+import CostosView from "./finanzas/CostosView";
 
 const TABS = [
   { id: "resumen", label: "Resumen" },
   { id: "facturas", label: "Facturas" },
+  { id: "costos", label: "Costos" },
   { id: "proveedores", label: "Proveedores" },
 ];
 
@@ -133,6 +135,7 @@ export default function FinanzasPage() {
 
       {tab === "resumen" && <Resumen />}
       {tab === "facturas" && <FacturasView proveedores={proveedores} onData={cargarProveedores} />}
+      {tab === "costos" && <CostosView />}
       {tab === "proveedores" && <ProveedoresView proveedores={proveedores} onChanged={cargarProveedores} />}
     </div>
   );
