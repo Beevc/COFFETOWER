@@ -3,6 +3,7 @@ import { Plus, Minus, Search, AlertTriangle, Loader2, User, X, Star, UserPlus } 
 import { productsApi } from "../../api/products";
 import { ventasApi } from "../../api/ventas";
 import { fidelidadApi } from "../../api/fidelidad";
+import { promocionesApi } from "../../api/promociones";
 import { money } from "../../utils/format";
 import { useCaja } from "./CajaContext";
 import Comprobante from "./Comprobante";
@@ -17,6 +18,7 @@ const MEDIOS = [
 export default function VenderPage() {
   const { abierta, cargando: cajaCargando, refrescar } = useCaja();
   const [productos, setProductos] = useState([]);
+  const [promos, setPromos] = useState({}); // productoId -> { tipo, valor } (promos vigentes)
   const [cargando, setCargando] = useState(true);
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState([]);
@@ -45,6 +47,15 @@ export default function VenderPage() {
       .then(setProductos)
       .catch(() => setError("No se pudieron cargar los productos"))
       .finally(() => setCargando(false));
+    // Promociones vigentes (para mostrar el descuento en el carrito antes de cobrar).
+    promocionesApi
+      .list()
+      .then((lista) => {
+        const m = {};
+        lista.filter((p) => p.vigente).forEach((p) => { m[p.productoId] = { tipo: p.tipoDescuento, valor: p.valor }; });
+        setPromos(m);
+      })
+      .catch(() => {});
   }, []);
 
   // Búsqueda de clientes (fidelidad) con debounce.
@@ -84,6 +95,26 @@ export default function VenderPage() {
     );
 
   const total = cart.reduce((s, i) => s + i.precio * i.cantidad, 0);
+
+  // --- Vista previa de descuentos (replica el cálculo del backend) ---
+  let promoDescuento = 0;
+  for (const i of cart) {
+    const promo = promos[i.id];
+    if (!promo) continue;
+    const subtotal = i.precio * i.cantidad;
+    let d = promo.tipo === "porcentaje" ? Math.round((subtotal * promo.valor) / 100) : Math.round(promo.valor * i.cantidad);
+    promoDescuento += Math.min(d, subtotal);
+  }
+  let fidDescuento = 0, beneficioPreview = null, regaloPreview = null;
+  if (cliente && cliente.premioEnProximaCompra && cliente.proximoPremio && cart.length > 0) {
+    const pr = cliente.proximoPremio;
+    if (pr.tipo === "gratis") { fidDescuento = Math.max(...cart.map((i) => i.precio)); beneficioPreview = `Frappé gratis (nivel ${pr.compras})`; }
+    else if (pr.tipo === "monto") { fidDescuento = pr.valor; beneficioPreview = `${money(pr.valor)} de descuento (nivel ${pr.compras})`; }
+    else { regaloPreview = pr.descripcion; beneficioPreview = `Regalo (nivel ${pr.compras})`; }
+  }
+  let descuentoPreview = promoDescuento + fidDescuento;
+  if (descuentoPreview > total) descuentoPreview = total;
+  const totalFinal = total - descuentoPreview;
 
   const pagar = async (medioPago) => {
     setError("");
@@ -344,10 +375,32 @@ export default function VenderPage() {
             </div>
           ))}
           <div className="my-2 border-t border-frappe-border" />
-          <div className="mb-3 flex justify-between text-base font-bold text-frappe-text">
+          {descuentoPreview > 0 && (
+            <div className="flex justify-between text-sm font-semibold text-frappe-success">
+              <span>Descuento</span>
+              <span>-{money(descuentoPreview)}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between text-base font-bold text-frappe-text">
             <span>Total</span>
-            <span>{money(total)}</span>
+            <span>
+              {descuentoPreview > 0 && (
+                <span className="mr-2 text-sm font-normal text-frappe-textSoft line-through">{money(total)}</span>
+              )}
+              {money(totalFinal)}
+            </span>
           </div>
+          {beneficioPreview && (
+            <div className="mt-2 rounded-lg bg-frappe-accentSoft px-3 py-1.5 text-center text-xs font-semibold text-frappe-accentDark">
+              🎉 {beneficioPreview}
+            </div>
+          )}
+          {regaloPreview && (
+            <div className="mt-2 rounded-lg bg-frappe-accent px-3 py-1.5 text-center text-xs font-bold text-white">
+              🎁 Entregar regalo: {regaloPreview}
+            </div>
+          )}
+          <div className="mb-3" />
 
           {/* Momento de preparación (para el barista) */}
           <div className="mb-3">
