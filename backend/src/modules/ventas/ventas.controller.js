@@ -4,7 +4,7 @@ const { HttpError } = require("../../utils/errors");
 const { asyncHandler } = require("../../utils/asyncHandler");
 const { turnoAbierto } = require("../caja/caja.controller");
 const { promosVigentes } = require("../promociones/promociones.controller");
-const { getConfig } = require("../fidelidad/fidelidad.controller");
+const { getConfig, getPremiosActivos } = require("../fidelidad/fidelidad.controller");
 
 const registrarSchema = z.object({
   medioPago: z.enum(["efectivo", "debito", "credito", "transferencia"], {
@@ -108,8 +108,9 @@ const registrar = asyncHandler(async (req, res) => {
       promoDescuento += d;
     }
 
-    // --- Fidelidad (opcional): si el cliente llegó al umbral, aplica beneficio ---
-    let cliente = null, redimio = false, beneficio = null, fidDescuento = 0;
+    // --- Fidelidad por niveles: al llegar a un nivel se aplica su premio ---
+    let cliente = null, beneficio = null, regalo = null, fidDescuento = 0;
+    let nuevoContador = null, resetContador = false, premioGanado = null;
     if (clienteId) {
       const { rows: crows } = await client.query(
         "SELECT * FROM cliente WHERE id = $1 AND local_id = $2 FOR UPDATE",
@@ -117,16 +118,27 @@ const registrar = asyncHandler(async (req, res) => {
       );
       cliente = crows[0];
       if (!cliente) throw new HttpError(400, "El cliente no existe en el local");
+      nuevoContador = cliente.compras_contador + 1; // esta compra suma 1
       const config = await getConfig(localId, runner);
-      if (config.activo && cliente.compras_contador >= config.umbral) {
-        redimio = true;
-        if (config.tipo_beneficio === "gratis") {
-          fidDescuento = Math.max(...lineas.map((l) => l.precioUnit)); // un frappé gratis
-          beneficio = "Frappé gratis por fidelidad";
-        } else {
-          fidDescuento = Math.round(((grossTotal - promoDescuento) * Number(config.valor)) / 100);
-          beneficio = `${Number(config.valor)}% de descuento por fidelidad`;
+      if (config.activo) {
+        const premios = await getPremiosActivos(localId, runner);
+        const tier = premios.find((p) => p.compras === nuevoContador);
+        if (tier) {
+          premioGanado = tier;
+          if (tier.tipo === "gratis") {
+            fidDescuento = Math.max(...lineas.map((l) => l.precioUnit)); // un frappé gratis
+            beneficio = `Frappé gratis (nivel ${tier.compras})`;
+          } else if (tier.tipo === "monto") {
+            fidDescuento = Number(tier.valor);
+            beneficio = `$${Number(tier.valor)} de descuento (nivel ${tier.compras})`;
+          } else { // regalo
+            regalo = tier.descripcion;
+            beneficio = `Regalo: ${tier.descripcion} (nivel ${tier.compras})`;
+          }
         }
+        // Al llegar al nivel más alto, el contador se reinicia (nuevo ciclo).
+        const maxTier = premios.length ? premios[premios.length - 1].compras : 0;
+        if (maxTier && nuevoContador >= maxTier) resetContador = true;
       }
     }
 
@@ -202,21 +214,17 @@ const registrar = asyncHandler(async (req, res) => {
       }
     }
 
-    // --- Fidelidad: actualizar contador / registrar canje ---
+    // --- Fidelidad: actualizar contador (con reinicio de ciclo) y registrar canje ---
     if (cliente) {
-      if (redimio) {
-        await client.query(
-          "UPDATE cliente SET compras_contador = 0, updated_at = now() WHERE id = $1",
-          [cliente.id]
-        );
+      const finalContador = resetContador ? 0 : nuevoContador;
+      await client.query(
+        "UPDATE cliente SET compras_contador = $1, updated_at = now() WHERE id = $2",
+        [finalContador, cliente.id]
+      );
+      if (premioGanado) {
         await client.query(
           "INSERT INTO canje (local_id, cliente_id, venta_id, beneficio) VALUES ($1,$2,$3,$4)",
           [localId, cliente.id, venta.id, beneficio]
-        );
-      } else {
-        await client.query(
-          "UPDATE cliente SET compras_contador = compras_contador + 1, updated_at = now() WHERE id = $1",
-          [cliente.id]
         );
       }
     }
@@ -236,6 +244,7 @@ const registrar = asyncHandler(async (req, res) => {
       alertas,
       descuento,
       beneficio,
+      regalo,
     });
   } catch (err) {
     await client.query("ROLLBACK");

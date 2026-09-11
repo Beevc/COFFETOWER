@@ -94,8 +94,8 @@ export default function VenderPage() {
       // Si hay cliente de fidelidad se usa su nombre; si no, el escrito para el pedido.
       if (!cliente && nombrePedido.trim()) extra.nombreCliente = nombrePedido.trim();
       if (momento === "programado" && horaProg) extra.horaProgramada = horaProg;
-      const { venta, alertas, beneficio } = await ventasApi.registrar(medioPago, items, extra);
-      setComprobante({ ...venta, alertas, beneficio });
+      const { venta, alertas, beneficio, regalo } = await ventasApi.registrar(medioPago, items, extra);
+      setComprobante({ ...venta, alertas, beneficio, regalo });
       setCart([]);
       setCliente(null);
       setCliQuery("");
@@ -214,11 +214,13 @@ export default function VenderPage() {
                   <User size={14} className="text-frappe-accentDark" />
                   <span className="font-semibold text-frappe-text">{cliente.nombre}</span>
                   <span className="text-xs text-frappe-textSoft">({cliente.comprasContador} compras)</span>
-                  {cliente.beneficioDisponible && (
+                  {cliente.premioEnProximaCompra ? (
                     <span className="flex items-center gap-1 rounded-full bg-frappe-surface px-2 py-0.5 text-xs font-semibold text-frappe-accentDark">
-                      <Star size={10} /> beneficio
+                      <Star size={10} /> premio en esta compra
                     </span>
-                  )}
+                  ) : cliente.proximoPremio ? (
+                    <span className="text-xs text-frappe-textSoft">faltan {cliente.faltan}</span>
+                  ) : null}
                 </div>
                 <button onClick={() => { setCliente(null); setCliQuery(""); }} className="text-frappe-textSoft hover:text-frappe-danger">
                   <X size={15} />

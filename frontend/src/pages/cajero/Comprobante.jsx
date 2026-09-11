@@ -60,9 +60,14 @@ export default function Comprobante({ venta, onNueva, onAnular }) {
       <div className="mt-1 text-xs text-frappe-textSoft">
         Medio de pago: {MEDIO_LABEL[venta.medioPago] || venta.medioPago}
       </div>
-      {venta.beneficio && (
+      {venta.beneficio && !venta.regalo && (
         <div className="mt-2 rounded-lg bg-frappe-accentSoft px-3 py-2 text-center text-xs font-semibold text-frappe-accentDark">
           🎉 {venta.beneficio}
+        </div>
+      )}
+      {venta.regalo && (
+        <div className="mt-2 rounded-lg bg-frappe-accent px-3 py-2 text-center text-sm font-bold text-white">
+          🎁 Entregar regalo: {venta.regalo}
         </div>
       )}
 
