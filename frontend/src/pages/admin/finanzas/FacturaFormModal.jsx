@@ -87,6 +87,7 @@ export default function FacturaFormModal({ proveedores, onClose, onSaved }) {
           <div className="mb-3 rounded-lg bg-frappe-dangerSoft px-3 py-2 text-sm font-medium text-frappe-danger">{error}</div>
         )}
 
+        {/* Proveedor + categoría */}
         <div className="mb-3 grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Proveedor</label>
@@ -101,14 +102,24 @@ export default function FacturaFormModal({ proveedores, onClose, onSaved }) {
               {CATEGORIAS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </select>
           </div>
-          <div>
-            <label className={labelCls}>N° de factura (opcional)</label>
-            <input className={inputCls} value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="Ej. 001234" />
+        </div>
+
+        {/* Monto destacado */}
+        <div className="mb-3 rounded-xl border border-frappe-border bg-frappe-accentSoft/50 p-3">
+          <label className={labelCls}>Monto total (CLP)</label>
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lg font-bold text-frappe-textSoft">$</span>
+            <input type="number" min="0" step="1" inputMode="numeric"
+              className="w-full rounded-lg border border-frappe-border bg-frappe-surface py-2.5 pl-8 pr-3 text-lg font-bold text-frappe-text outline-none focus:border-frappe-accent"
+              value={montoTotal} onChange={(e) => setMontoTotal(e.target.value)} placeholder="0" required />
           </div>
-          <div>
-            <label className={labelCls}>Monto total (CLP)</label>
-            <input type="number" min="0" step="1" className={inputCls} value={montoTotal} onChange={(e) => setMontoTotal(e.target.value)} placeholder="0" required />
-          </div>
+          {montoTotal ? (
+            <div className="mt-1 text-right text-xs text-frappe-textSoft">{money(Math.trunc(Number(montoTotal)) || 0)}</div>
+          ) : null}
+        </div>
+
+        {/* Fechas */}
+        <div className="mb-3 grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Fecha de emisión</label>
             <input type="date" className={inputCls} value={fechaEmision} onChange={(e) => setFechaEmision(e.target.value)} required />
@@ -119,8 +130,15 @@ export default function FacturaFormModal({ proveedores, onClose, onSaved }) {
           </div>
         </div>
 
-        <label className={labelCls}>Descripción (opcional)</label>
-        <input className={`${inputCls} mb-3`} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Detalle del gasto" />
+        {/* Datos opcionales */}
+        <div className="mb-3">
+          <label className={labelCls}>N° de factura (opcional)</label>
+          <input className={inputCls} value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="Ej. 001234" />
+        </div>
+        <div className="mb-3">
+          <label className={labelCls}>Descripción (opcional)</label>
+          <input className={inputCls} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Detalle del gasto" />
+        </div>
 
         {/* Ítems que suman stock */}
         <div className="mb-3 rounded-lg border border-frappe-border bg-frappe-bg/50 p-3">
@@ -185,7 +203,6 @@ export default function FacturaFormModal({ proveedores, onClose, onSaved }) {
             {guardando && <Loader2 size={15} className="animate-spin" />} Guardar factura
           </button>
         </div>
-        {montoTotal && <div className="mt-2 text-right text-xs text-frappe-textSoft">Total: <b className="text-frappe-text">{money(Math.trunc(Number(montoTotal)) || 0)}</b></div>}
       </form>
     </Modal>
   );
