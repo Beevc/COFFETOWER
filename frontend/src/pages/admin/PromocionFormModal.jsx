@@ -70,15 +70,13 @@ export default function PromocionFormModal({ modo, promo, productos, onClose, on
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelCls}>Desde</label>
-            <input type="date" className={inputCls} value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} required />
-          </div>
-          <div>
-            <label className={labelCls}>Hasta</label>
-            <input type="date" className={inputCls} value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} required />
-          </div>
+        <div className="mb-3">
+          <label className={labelCls}>Desde</label>
+          <input type="date" className={`${inputCls} block min-w-0 appearance-none`} value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} required />
+        </div>
+        <div className="mb-4">
+          <label className={labelCls}>Hasta</label>
+          <input type="date" className={`${inputCls} block min-w-0 appearance-none`} value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} required />
         </div>
 
         <div className="flex gap-2">

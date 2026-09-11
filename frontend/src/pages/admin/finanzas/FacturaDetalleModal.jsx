@@ -133,12 +133,14 @@ export default function FacturaDetalleModal({ facturaId, onClose, onChanged }) {
           {f.saldo > 0 && (
             <div className="mb-4 rounded-lg border border-frappe-border bg-frappe-bg/50 p-3">
               <div className="mb-2 text-sm font-semibold text-frappe-text">Registrar pago</div>
-              <div className="grid grid-cols-3 gap-2">
-                <input type="number" min="0" step="1" className={inputCls} value={monto} onChange={(e) => setMonto(e.target.value)} placeholder="Monto" />
-                <select className={inputCls} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
-                  {MEDIOS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                </select>
-                <input type="date" className={inputCls} value={fecha} onChange={(e) => setFecha(e.target.value)} />
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input type="number" min="0" step="1" inputMode="numeric" className={`${inputCls} flex-1`} value={monto} onChange={(e) => setMonto(e.target.value)} placeholder="Monto" />
+                  <select className={`${inputCls} w-32 shrink-0`} value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
+                    {MEDIOS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                </div>
+                <input type="date" className={`${inputCls} block min-w-0 appearance-none`} value={fecha} onChange={(e) => setFecha(e.target.value)} />
               </div>
               <button onClick={abonar} disabled={guardando} className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-frappe-accent py-2 text-sm font-semibold text-white hover:bg-frappe-accentDark disabled:opacity-60">
                 {guardando ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Registrar pago
