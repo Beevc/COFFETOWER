@@ -8,8 +8,8 @@ const router = Router();
 // Cualquier usuario autenticado puede ver el estado de la caja.
 router.get("/estado", authenticate, estado);
 
-// Abrir/cerrar caja: cajero y admin.
-router.post("/abrir", authenticate, requireRole("cajero", "admin"), validateBody(abrirSchema), abrir);
-router.post("/cerrar", authenticate, requireRole("cajero", "admin"), validateBody(cerrarSchema), cerrar);
+// Abrir/cerrar caja: SOLO admin (asigna cajero y monto; los cajeros no pueden).
+router.post("/abrir", authenticate, requireRole("admin"), validateBody(abrirSchema), abrir);
+router.post("/cerrar", authenticate, requireRole("admin"), validateBody(cerrarSchema), cerrar);
 
 module.exports = router;

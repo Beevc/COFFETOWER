@@ -11,6 +11,7 @@ import InsumosPage from "./pages/admin/InsumosPage";
 import RecetasPage from "./pages/admin/RecetasPage";
 import EstadisticasPage from "./pages/admin/EstadisticasPage";
 import FinanzasPage from "./pages/admin/FinanzasPage";
+import AdminCajaPage from "./pages/admin/AdminCajaPage";
 import PromocionesPage from "./pages/admin/PromocionesPage";
 import FidelidadPage from "./pages/admin/FidelidadPage";
 import ConvenioPage from "./pages/admin/ConvenioPage";
@@ -62,6 +63,7 @@ export default function App() {
             <Route index element={<Navigate to="estadisticas" replace />} />
             <Route path="estadisticas" element={<EstadisticasPage />} />
             <Route path="finanzas" element={<FinanzasPage />} />
+            <Route path="caja" element={<AdminCajaPage />} />
             <Route path="usuarios" element={<UsersPage />} />
             <Route path="productos" element={<ProductsPage />} />
             <Route path="categorias" element={<CategoriasPage />} />

@@ -4,6 +4,7 @@ const { HttpError } = require("../../utils/errors");
 const { asyncHandler } = require("../../utils/asyncHandler");
 
 const abrirSchema = z.object({
+  cajeroId: z.number().int().positive("Debes elegir un cajero"),
   montoInicial: z.number().int("Debe ser un entero").min(0, "No puede ser negativo"),
 });
 
@@ -59,16 +60,25 @@ const estado = asyncHandler(async (req, res) => {
   res.json({ turno: { ...publicTurno(turno), totales } });
 });
 
-// POST /api/caja/abrir
+// POST /api/caja/abrir  (solo admin: asigna cajero y monto)
 const abrir = asyncHandler(async (req, res) => {
-  const { montoInicial } = req.body;
+  const { cajeroId, montoInicial } = req.body;
+  const localId = req.user.localId;
+
+  // El cajero asignado debe existir, estar activo y ser del local.
+  const { rows: cj } = await query(
+    "SELECT id, nombre FROM usuario WHERE id = $1 AND local_id = $2 AND rol = 'cajero' AND activo = true",
+    [cajeroId, localId]
+  );
+  if (!cj[0]) throw new HttpError(400, "El cajero seleccionado no es válido");
+
   try {
     const { rows } = await query(
-      `INSERT INTO caja_turno (local_id, cajero_id, monto_inicial)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [req.user.localId, req.user.id, montoInicial]
+      `INSERT INTO caja_turno (local_id, cajero_id, monto_inicial, abierto_por_id)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [localId, cajeroId, montoInicial, req.user.id]
     );
-    const turno = { ...rows[0], cajero_nombre: req.user.nombre };
+    const turno = { ...rows[0], cajero_nombre: cj[0].nombre };
     res.status(201).json({ turno: publicTurno(turno) });
   } catch (err) {
     // Índice único parcial: ya hay una caja abierta.
