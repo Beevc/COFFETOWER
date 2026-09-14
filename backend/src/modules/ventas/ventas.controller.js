@@ -121,9 +121,17 @@ const registrar = asyncHandler(async (req, res) => {
     for (const l of lineas) {
       const promo = promos.get(l.productoId);
       if (!promo) continue;
-      let d = promo.tipo === "porcentaje"
-        ? Math.round((l.subtotal * promo.valor) / 100)
-        : Math.round(promo.valor * l.cantidad); // 'monto' = descuento por unidad
+      let d;
+      if (promo.tipo === "pack") {
+        // Nx precio: cada N unidades se cobran packPrecio (el resto va normal).
+        const packs = Math.floor(l.cantidad / promo.packCantidad);
+        const ahorroPorPack = promo.packCantidad * l.precioUnit - promo.packPrecio;
+        d = Math.max(0, packs * ahorroPorPack);
+      } else {
+        d = promo.tipo === "porcentaje"
+          ? Math.round((l.subtotal * promo.valor) / 100)
+          : Math.round(promo.valor * l.cantidad); // 'monto' = descuento por unidad
+      }
       d = Math.min(d, l.subtotal);
       promoDescuento += d;
     }

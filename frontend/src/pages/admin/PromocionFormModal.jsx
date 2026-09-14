@@ -13,6 +13,8 @@ export default function PromocionFormModal({ modo, promo, productos, onClose, on
   const [productoId, setProductoId] = useState(promo?.productoId || (productos[0]?.id ?? ""));
   const [tipoDescuento, setTipoDescuento] = useState(promo?.tipoDescuento || "porcentaje");
   const [valor, setValor] = useState(promo?.valor != null ? String(promo.valor) : "");
+  const [packCantidad, setPackCantidad] = useState(promo?.packCantidad != null ? String(promo.packCantidad) : "2");
+  const [packPrecio, setPackPrecio] = useState(promo?.packPrecio != null ? String(promo.packPrecio) : "");
   const [fechaInicio, setFechaInicio] = useState(promo?.fechaInicio?.slice(0, 10) || new Date().toISOString().slice(0, 10));
   const [fechaFin, setFechaFin] = useState(promo?.fechaFin?.slice(0, 10) || new Date().toISOString().slice(0, 10));
   const [error, setError] = useState("");
@@ -23,15 +25,15 @@ export default function PromocionFormModal({ modo, promo, productos, onClose, on
     setError("");
     setGuardando(true);
     try {
+      const esPack = tipoDescuento === "pack";
+      const campos = esPack
+        ? { packCantidad: Math.trunc(Number(packCantidad)) || 0, packPrecio: Math.trunc(Number(packPrecio)) || 0 }
+        : { valor: Number(valor) };
       let guardado;
       if (esEditar) {
-        guardado = await promocionesApi.update(promo.id, {
-          nombre: nombre.trim(), tipoDescuento, valor: Number(valor), fechaInicio, fechaFin,
-        });
+        guardado = await promocionesApi.update(promo.id, { nombre: nombre.trim(), tipoDescuento, ...campos, fechaInicio, fechaFin });
       } else {
-        guardado = await promocionesApi.create({
-          nombre: nombre.trim(), productoId: Number(productoId), tipoDescuento, valor: Number(valor), fechaInicio, fechaFin,
-        });
+        guardado = await promocionesApi.create({ nombre: nombre.trim(), productoId: Number(productoId), tipoDescuento, ...campos, fechaInicio, fechaFin });
       }
       onSaved(guardado);
     } catch (err) {
@@ -56,19 +58,30 @@ export default function PromocionFormModal({ modo, promo, productos, onClose, on
           {productos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
         </select>
 
-        <div className="mb-3 grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelCls}>Tipo</label>
-            <select className={inputCls} value={tipoDescuento} onChange={(e) => setTipoDescuento(e.target.value)}>
-              <option value="porcentaje">Porcentaje (%)</option>
-              <option value="monto">Monto ($ por unidad)</option>
-            </select>
+        <label className={labelCls}>Tipo</label>
+        <select className={`${inputCls} mb-3`} value={tipoDescuento} onChange={(e) => setTipoDescuento(e.target.value)}>
+          <option value="porcentaje">Porcentaje (%)</option>
+          <option value="monto">Monto ($ por unidad)</option>
+          <option value="pack">Pack (Nx precio, ej. 2 x $7.000)</option>
+        </select>
+
+        {tipoDescuento === "pack" ? (
+          <div className="mb-3 grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Cantidad (N)</label>
+              <input type="number" min="2" step="1" className={inputCls} value={packCantidad} onChange={(e) => setPackCantidad(e.target.value)} required placeholder="2" />
+            </div>
+            <div>
+              <label className={labelCls}>Precio del pack (CLP)</label>
+              <input type="number" min="0" step="1" className={inputCls} value={packPrecio} onChange={(e) => setPackPrecio(e.target.value)} required placeholder="7000" />
+            </div>
           </div>
-          <div>
-            <label className={labelCls}>Valor</label>
+        ) : (
+          <div className="mb-3">
+            <label className={labelCls}>Valor {tipoDescuento === "porcentaje" ? "(%)" : "($ por unidad)"}</label>
             <input type="number" step="any" min="0" className={inputCls} value={valor} onChange={(e) => setValor(e.target.value)} required placeholder={tipoDescuento === "porcentaje" ? "20" : "500"} />
           </div>
-        </div>
+        )}
 
         <div className="mb-3">
           <label className={labelCls}>Desde</label>

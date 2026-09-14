@@ -36,7 +36,10 @@ export default function PromocionesPage() {
     }
   };
 
-  const desc = (p) => (p.tipoDescuento === "porcentaje" ? `${p.valor}%` : `$${p.valor}/u`);
+  const desc = (p) =>
+    p.tipoDescuento === "pack" ? `${p.packCantidad} x $${p.packPrecio?.toLocaleString("es-CL")}`
+    : p.tipoDescuento === "porcentaje" ? `${p.valor}%`
+    : `$${p.valor}/u`;
 
   return (
     <div>

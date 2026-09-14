@@ -64,7 +64,9 @@ export default function VenderPage() {
       .finally(() => setCargando(false));
     promocionesApi.list().then((lista) => {
       const m = {};
-      lista.filter((p) => p.vigente).forEach((p) => { m[p.productoId] = { tipo: p.tipoDescuento, valor: p.valor }; });
+      lista.filter((p) => p.vigente).forEach((p) => {
+        m[p.productoId] = { tipo: p.tipoDescuento, valor: p.valor, packCantidad: p.packCantidad, packPrecio: p.packPrecio };
+      });
       setPromos(m);
     }).catch(() => {});
   }, []);
@@ -123,7 +125,13 @@ export default function VenderPage() {
     const promo = promos[i.id];
     if (!promo) continue;
     const subtotal = perUnit(i) * i.cantidad;
-    const d = promo.tipo === "porcentaje" ? Math.round((subtotal * promo.valor) / 100) : Math.round(promo.valor * i.cantidad);
+    let d;
+    if (promo.tipo === "pack") {
+      const packs = Math.floor(i.cantidad / promo.packCantidad);
+      d = Math.max(0, packs * (promo.packCantidad * i.precio - promo.packPrecio));
+    } else {
+      d = promo.tipo === "porcentaje" ? Math.round((subtotal * promo.valor) / 100) : Math.round(promo.valor * i.cantidad);
+    }
     promoDescuento += Math.min(d, subtotal);
   }
   let fidDescuento = 0, beneficioPreview = null, regaloPreview = null;
