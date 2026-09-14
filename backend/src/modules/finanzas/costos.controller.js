@@ -1,4 +1,5 @@
 const { query } = require("../../config/db");
+const { HttpError } = require("../../utils/errors");
 const { asyncHandler } = require("../../utils/asyncHandler");
 
 // GET /api/finanzas/costos
@@ -40,4 +41,50 @@ const costos = asyncHandler(async (req, res) => {
   res.json({ productos });
 });
 
-module.exports = { costos };
+// GET /api/finanzas/costos/:productoId  -> desglose por insumo de la receta
+const costoDetalle = asyncHandler(async (req, res) => {
+  const id = Number(req.params.productoId);
+  const localId = req.user.localId;
+  const prod = await query("SELECT id, nombre, precio FROM producto WHERE id = $1 AND local_id = $2", [id, localId]);
+  if (!prod.rows[0]) throw new HttpError(404, "Producto no encontrado");
+
+  const { rows } = await query(
+    `SELECT i.id AS "insumoId", i.nombre, i.unidad, i.unidad_receta AS "unidadReceta",
+            i.factor_receta AS "factorReceta", i.costo_unitario AS "costoUnitario", ri.cantidad
+       FROM receta_item ri JOIN insumo i ON i.id = ri.insumo_id
+      WHERE ri.producto_id = $1
+      ORDER BY i.nombre`,
+    [id]
+  );
+
+  const items = rows.map((r) => {
+    const cantidad = Number(r.cantidad);
+    const factor = Number(r.factorReceta);
+    const costoU = Number(r.costoUnitario);
+    const baseCantidad = cantidad * factor; // en la unidad real del insumo
+    return {
+      insumoId: r.insumoId,
+      nombre: r.nombre,
+      unidad: r.unidad,
+      unidadReceta: r.unidadReceta || null,
+      cantidad,
+      factorReceta: factor,
+      costoUnitario: costoU,
+      baseCantidad,
+      subtotal: Math.round(baseCantidad * costoU),
+      sinCosto: costoU === 0,
+    };
+  });
+
+  const precio = Number(prod.rows[0].precio);
+  const costo = items.reduce((s, x) => s + x.subtotal, 0);
+  res.json({
+    producto: { id: prod.rows[0].id, nombre: prod.rows[0].nombre, precio },
+    items,
+    costo,
+    ganancia: precio - costo,
+    margen: precio > 0 ? Math.round(((precio - costo) / precio) * 100) : 0,
+  });
+});
+
+module.exports = { costos, costoDetalle };

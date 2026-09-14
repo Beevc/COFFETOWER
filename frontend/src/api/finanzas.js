@@ -3,6 +3,7 @@ import api from "./client";
 export const finanzasApi = {
   resumen: (params = {}) => api.get("/finanzas/resumen", { params }).then((r) => r.data),
   costos: () => api.get("/finanzas/costos").then((r) => r.data.productos),
+  costoDetalle: (productoId) => api.get(`/finanzas/costos/${productoId}`).then((r) => r.data),
 
   proveedores: (activo) =>
     api.get("/finanzas/proveedores", { params: activo != null ? { activo } : {} }).then((r) => r.data.proveedores),
