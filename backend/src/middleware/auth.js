@@ -47,4 +47,10 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { authenticate, requireRole };
+// Helper reutilizable fuera del middleware: ¿el rol tiene alguna de estas capacidades?
+function rolTiene(rol, ...roles) {
+  const caps = CAPS[rol] || [rol];
+  return roles.some((r) => caps.includes(r));
+}
+
+module.exports = { authenticate, requireRole, rolTiene };

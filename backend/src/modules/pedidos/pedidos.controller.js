@@ -2,6 +2,7 @@ const { z } = require("zod");
 const { query } = require("../../config/db");
 const { HttpError } = require("../../utils/errors");
 const { asyncHandler } = require("../../utils/asyncHandler");
+const { rolTiene } = require("../../middleware/auth");
 
 const TZ = "America/Santiago";
 
@@ -102,8 +103,8 @@ const cambiarEstado = asyncHandler(async (req, res) => {
   if (SIGUIENTE[actual.estado] !== estado) {
     throw new HttpError(400, `No se puede pasar de "${actual.estado}" a "${estado}"`);
   }
-  // Y solo el rol que corresponde a ese paso.
-  if (!ROL_PARA[estado].includes(req.user.rol)) {
+  // Y solo el rol que corresponde a ese paso (cajero_barista cuenta como ambos).
+  if (!rolTiene(req.user.rol, ...ROL_PARA[estado])) {
     throw new HttpError(403, "Tu rol no puede hacer este cambio de estado");
   }
 

@@ -350,7 +350,7 @@ export default function VenderPage() {
           <div className="mb-3">
             <div className="mb-1 text-xs text-frappe-textSoft">Preparación:</div>
             <div className="flex gap-1 rounded-lg bg-frappe-accentSoft p-1">
-              {[{ id: "al_momento", label: "Al momento" }, { id: "despues", label: "Después" }, { id: "programado", label: "Programar" }].map((m) => (
+              {[{ id: "al_momento", label: "Al momento" }, { id: "programado", label: "Programado" }].map((m) => (
                 <button key={m.id} onClick={() => setMomento(m.id)}
                   className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${momento === m.id ? "bg-frappe-surface text-frappe-accentDark shadow-sm" : "text-frappe-textSoft"}`}>
                   {m.label}
