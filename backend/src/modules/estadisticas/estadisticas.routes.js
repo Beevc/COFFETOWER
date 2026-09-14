@@ -1,10 +1,13 @@
 const { Router } = require("express");
-const { resumen } = require("./estadisticas.controller");
+const { resumen, serie, periodos } = require("./estadisticas.controller");
 const { authenticate, requireRole } = require("../../middleware/auth");
 
 const router = Router();
 
 // Solo el administrador ve estadísticas globales.
-router.get("/", authenticate, requireRole("admin"), resumen);
+router.use(authenticate, requireRole("admin"));
+router.get("/", resumen);
+router.get("/serie", serie);
+router.get("/periodos", periodos);
 
 module.exports = router;
