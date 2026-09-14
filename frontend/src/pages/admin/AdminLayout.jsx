@@ -81,7 +81,7 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen bg-frappe-bg">
       {/* Sidebar fijo (pantallas grandes) */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 bg-frappe-text lg:block">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 bg-frappe-sidebar lg:block">
         <SidebarContent />
       </aside>
 
@@ -89,7 +89,7 @@ export default function AdminLayout() {
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 w-64 bg-frappe-text shadow-xl">
+          <aside className="absolute inset-y-0 left-0 w-64 bg-frappe-sidebar shadow-xl">
             <button onClick={() => setOpen(false)} className="absolute right-3 top-3 rounded-lg p-1 text-white/70 hover:bg-white/10 hover:text-white">
               <X size={18} />
             </button>

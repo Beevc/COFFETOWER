@@ -13,7 +13,7 @@ export default function BarChart({ data, formatValue = (v) => v, height = 150, s
               </div>
             )}
             <div
-              className={`w-full rounded-t ${d.highlight ? "bg-frappe-accentDark" : "bg-frappe-accent"}`}
+              className={`w-full rounded-t ${d.highlight ? "bg-frappe-honey" : "bg-frappe-accent"}`}
               style={{ height: `${(d.value / max) * 100}%`, minHeight: d.value > 0 ? 3 : 1, opacity: d.value > 0 ? 1 : 0.25 }}
             />
           </div>

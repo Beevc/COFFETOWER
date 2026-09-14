@@ -8,12 +8,14 @@ export default {
         frappe: {
           bg: "#FAF5EC",
           surface: "#FFFFFF",
-          border: "#E8DDC9",
+          border: "#ECE1CE",
           text: "#2B1D14",
-          textSoft: "#6B5645",
-          accent: "#B6752B",
-          accentDark: "#8A5A1F",
-          accentSoft: "#F1E2C8",
+          textSoft: "#8A7867",
+          accent: "#C9721C",       // caramelo (paleta 5)
+          accentDark: "#A85E17",
+          accentSoft: "#F6E7D0",
+          honey: "#E4A11B",        // acento secundario (destacados)
+          sidebar: "#3A2417",      // chocolate (barra lateral)
           success: "#4F6E4C",
           successSoft: "#E3ECE0",
           danger: "#A8432E",
