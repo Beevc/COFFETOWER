@@ -28,10 +28,16 @@ export function CajaProvider({ children }) {
     return cerrado; // incluye diferencia y totales para el resumen
   }, [refrescar]);
 
+  const arqueo = useCallback(async (contado, nota) => {
+    const a = await cajaApi.arqueo(contado, nota);
+    await refrescar();
+    return a;
+  }, [refrescar]);
+
   const abierta = !!turno && turno.estado === "abierta";
 
   return (
-    <CajaContext.Provider value={{ turno, abierta, cargando, refrescar, abrir, cerrar }}>
+    <CajaContext.Provider value={{ turno, abierta, cargando, refrescar, abrir, cerrar, arqueo }}>
       {children}
     </CajaContext.Provider>
   );

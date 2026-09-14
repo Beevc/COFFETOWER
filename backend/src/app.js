@@ -14,6 +14,7 @@ const promocionesRoutes = require("./modules/promociones/promociones.routes");
 const fidelidadRoutes = require("./modules/fidelidad/fidelidad.routes");
 const pedidosRoutes = require("./modules/pedidos/pedidos.routes");
 const finanzasRoutes = require("./modules/finanzas/finanzas.routes");
+const inventarioRoutes = require("./modules/inventario/inventario.routes");
 const { errorHandler, notFound } = require("./middleware/errorHandler");
 
 const app = express();
@@ -41,6 +42,7 @@ app.use("/api/promociones", promocionesRoutes);
 app.use("/api/fidelidad", fidelidadRoutes);
 app.use("/api/pedidos", pedidosRoutes);
 app.use("/api/finanzas", finanzasRoutes);
+app.use("/api/inventario", inventarioRoutes);
 
 // 404 + manejo de errores (siempre al final).
 app.use(notFound);

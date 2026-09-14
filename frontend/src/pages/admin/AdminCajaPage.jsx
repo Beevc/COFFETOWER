@@ -156,6 +156,25 @@ export default function AdminCajaPage() {
             <div className="text-xs text-frappe-textSoft">Monto inicial</div>
             <div className="text-lg font-bold text-frappe-text">{money(turno.montoInicial)}</div>
           </div>
+          {(turno.arqueos || []).length > 0 && (
+            <div>
+              <div className="mb-1 text-xs font-semibold text-frappe-textSoft">Cortes / mini cierres del turno</div>
+              <div className="overflow-hidden rounded-xl border border-frappe-border bg-frappe-surface">
+                {turno.arqueos.map((a) => (
+                  <div key={a.id} className="border-b border-frappe-border px-3 py-2 text-sm last:border-b-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-frappe-textSoft">{new Date(a.createdAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}{a.usuarioNombre ? ` · ${a.usuarioNombre}` : ""}</span>
+                      <span className={`font-semibold ${a.diferencia === 0 ? "text-frappe-success" : "text-frappe-danger"}`}>
+                        {a.diferencia === 0 ? "cuadra" : `${a.diferencia > 0 ? "+" : ""}${money(a.diferencia)}`}
+                      </span>
+                    </div>
+                    <div className="text-xs text-frappe-textSoft">Contó {money(a.efectivoContado)} · esperado {money(a.efectivoEsperado)}{a.nota ? ` · ${a.nota}` : ""}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <button onClick={() => setCerrando(true)} className="rounded-lg border border-frappe-danger py-2.5 text-sm font-semibold text-frappe-danger transition hover:bg-frappe-dangerSoft">
             Cerrar caja
           </button>

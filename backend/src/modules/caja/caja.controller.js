@@ -12,6 +12,31 @@ const cerrarSchema = z.object({
   efectivoContado: z.number().int("Debe ser un entero").min(0, "No puede ser negativo"),
 });
 
+const arqueoSchema = z.object({
+  efectivoContado: z.number().int("Debe ser un entero").min(0, "No puede ser negativo"),
+  nota: z.string().trim().max(200).optional(),
+});
+
+const publicArqueo = (a) => ({
+  id: a.id,
+  usuarioNombre: a.usuario_nombre || null,
+  efectivoEsperado: a.efectivo_esperado,
+  efectivoContado: a.efectivo_contado,
+  diferencia: a.diferencia,
+  nota: a.nota,
+  createdAt: a.created_at,
+});
+
+async function listArqueos(turnoId) {
+  const { rows } = await query(
+    `SELECT a.*, u.nombre AS usuario_nombre
+       FROM arqueo_caja a LEFT JOIN usuario u ON u.id = a.usuario_id
+      WHERE a.caja_turno_id = $1 ORDER BY a.created_at DESC`,
+    [turnoId]
+  );
+  return rows.map(publicArqueo);
+}
+
 const publicTurno = (t) => ({
   id: t.id,
   estado: t.estado,
@@ -57,7 +82,25 @@ const estado = asyncHandler(async (req, res) => {
   const turno = await turnoAbierto(req.user.localId);
   if (!turno) return res.json({ turno: null });
   const totales = await totalesTurno(turno.id);
-  res.json({ turno: { ...publicTurno(turno), totales } });
+  const arqueos = await listArqueos(turno.id);
+  res.json({ turno: { ...publicTurno(turno), totales, arqueos } });
+});
+
+// POST /api/caja/arqueo  (mini cierre: cuenta efectivo sin cerrar la caja)
+const arqueo = asyncHandler(async (req, res) => {
+  const { efectivoContado, nota } = req.body;
+  const turno = await turnoAbierto(req.user.localId);
+  if (!turno) throw new HttpError(400, "No hay ninguna caja abierta");
+  const totales = await totalesTurno(turno.id);
+  const esperado = turno.monto_inicial + totales.efectivo;
+  const diferencia = efectivoContado - esperado;
+  const { rows } = await query(
+    `INSERT INTO arqueo_caja (local_id, caja_turno_id, usuario_id, efectivo_esperado, efectivo_contado, diferencia, nota)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+    [req.user.localId, turno.id, req.user.id, esperado, efectivoContado, diferencia, nota || null]
+  );
+  const a = { ...rows[0], usuario_nombre: req.user.nombre };
+  res.status(201).json({ arqueo: publicArqueo(a) });
 });
 
 // POST /api/caja/abrir  (solo admin: asigna cajero y monto)
@@ -115,4 +158,4 @@ const cerrar = asyncHandler(async (req, res) => {
   res.json({ turno: { ...publicTurno(cerrado), totales } });
 });
 
-module.exports = { estado, abrir, cerrar, abrirSchema, cerrarSchema, turnoAbierto };
+module.exports = { estado, abrir, cerrar, arqueo, abrirSchema, cerrarSchema, arqueoSchema, turnoAbierto };

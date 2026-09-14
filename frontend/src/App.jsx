@@ -8,6 +8,7 @@ import ProductsPage from "./pages/admin/ProductsPage";
 import CategoriasPage from "./pages/admin/CategoriasPage";
 import VentasPage from "./pages/admin/VentasPage";
 import InsumosPage from "./pages/admin/InsumosPage";
+import InventarioPage from "./pages/admin/InventarioPage";
 import RecetasPage from "./pages/admin/RecetasPage";
 import EstadisticasPage from "./pages/admin/EstadisticasPage";
 import FinanzasPage from "./pages/admin/FinanzasPage";
@@ -68,6 +69,7 @@ export default function App() {
             <Route path="productos" element={<ProductsPage />} />
             <Route path="categorias" element={<CategoriasPage />} />
             <Route path="insumos" element={<InsumosPage />} />
+            <Route path="inventario" element={<InventarioPage />} />
             <Route path="recetas" element={<RecetasPage />} />
             <Route path="promociones" element={<PromocionesPage />} />
             <Route path="fidelidad" element={<FidelidadPage />} />
