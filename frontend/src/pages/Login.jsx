@@ -35,7 +35,7 @@ export default function Login() {
             <Coffee size={26} />
           </div>
           <h1 className="font-serif text-2xl font-semibold text-frappe-text">
-            Gestión Frappé
+            Coffetower
           </h1>
           <p className="mt-1 text-sm text-frappe-textSoft">
             Inicia sesión para continuar

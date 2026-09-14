@@ -39,7 +39,7 @@ function Shell() {
             </div>
             <div>
               <div className="font-serif text-base font-semibold leading-tight text-frappe-text">
-                Gestión Frappé
+                Coffetower
               </div>
               <div className="text-xs text-frappe-textSoft">{usuario?.nombre}</div>
             </div>
