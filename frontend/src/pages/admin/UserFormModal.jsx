@@ -95,6 +95,7 @@ export default function UserFormModal({ modo, usuario, onClose, onSaved }) {
         >
           <option value="cajero">Cajero/a</option>
           <option value="barista">Barista</option>
+          <option value="cajero_barista">Cajero/a y Barista</option>
           <option value="admin">Administrador</option>
         </select>
 

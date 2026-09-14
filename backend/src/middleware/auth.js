@@ -26,11 +26,21 @@ function authenticate(req, _res, next) {
   }
 }
 
+// Capacidades por rol. 'cajero_barista' cuenta como cajero Y barista a la vez,
+// así las rutas que exigen "cajero" o "barista" no necesitan cambios.
+const CAPS = {
+  admin: ["admin"],
+  cajero: ["cajero"],
+  barista: ["barista"],
+  cajero_barista: ["cajero", "barista"],
+};
+
 // Restringe el acceso a ciertos roles. Uso: requireRole("admin")
 function requireRole(...roles) {
   return (req, _res, next) => {
     if (!req.user) return next(new HttpError(401, "No autenticado"));
-    if (!roles.includes(req.user.rol)) {
+    const caps = CAPS[req.user.rol] || [req.user.rol];
+    if (!roles.some((r) => caps.includes(r))) {
       return next(new HttpError(403, "No tienes permiso para esta acción"));
     }
     next();

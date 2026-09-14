@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Coffee, LogOut, Receipt, Wallet, Lock, Unlock, CupSoda, Users } from "lucide-react";
+import { Coffee, LogOut, Receipt, Wallet, Lock, Unlock, CupSoda, Users, ChefHat } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { CajaProvider, useCaja } from "./CajaContext";
 
@@ -29,6 +29,10 @@ function EstadoCajaBadge() {
 
 function Shell() {
   const { usuario, logout } = useAuth();
+  // El rol combinado (cajero_barista) ve además un acceso directo al panel de barista.
+  const items = usuario?.rol === "cajero_barista"
+    ? [...navItems, { to: "/barista", label: "Barista", icon: ChefHat }]
+    : navItems;
   return (
     <div className="min-h-full bg-frappe-bg">
       <header className="border-b border-frappe-border bg-frappe-surface">
@@ -55,8 +59,8 @@ function Shell() {
           </div>
         </div>
 
-        <nav className="mx-auto flex max-w-2xl gap-1 px-4">
-          {navItems.map(({ to, label, icon: Icon }) => (
+        <nav className="mx-auto flex max-w-2xl gap-1 overflow-x-auto px-4">
+          {items.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}

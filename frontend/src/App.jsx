@@ -28,6 +28,7 @@ const HOME_POR_ROL = {
   admin: "/admin",
   cajero: "/cajero",
   barista: "/barista",
+  cajero_barista: "/cajero",
 };
 
 // Si ya hay sesión, /login redirige al panel del rol.
@@ -83,7 +84,7 @@ export default function App() {
           <Route
             path="/cajero"
             element={
-              <ProtectedRoute roles={["cajero"]}>
+              <ProtectedRoute roles={["cajero", "cajero_barista"]}>
                 <CajeroLayout />
               </ProtectedRoute>
             }
@@ -99,7 +100,7 @@ export default function App() {
           <Route
             path="/barista"
             element={
-              <ProtectedRoute roles={["barista"]}>
+              <ProtectedRoute roles={["barista", "cajero_barista"]}>
                 <BaristaPage />
               </ProtectedRoute>
             }

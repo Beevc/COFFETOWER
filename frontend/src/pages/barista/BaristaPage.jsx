@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import { Coffee, LogOut, Check, Loader2, Clock, Zap, Timer, RefreshCw, Gift, Play, BookOpen, ChevronDown } from "lucide-react";
+import { Coffee, LogOut, Check, Loader2, Clock, Zap, Timer, RefreshCw, Gift, Play, BookOpen, ChevronDown, Receipt } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import { pedidosApi } from "../../api/pedidos";
 import { recetasApi } from "../../api/recetas";
@@ -191,6 +192,11 @@ export default function BaristaPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {usuario?.rol === "cajero_barista" && (
+            <Link to="/cajero" className="flex items-center gap-1.5 rounded-lg border border-frappe-border px-2.5 py-1.5 text-sm font-medium text-frappe-text transition hover:bg-frappe-bg">
+              <Receipt size={14} /> Caja
+            </Link>
+          )}
           <button onClick={() => cargar()} title="Actualizar" className="rounded-lg border border-frappe-border p-2 text-frappe-textSoft transition hover:bg-frappe-bg">
             <RefreshCw size={14} />
           </button>

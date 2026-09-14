@@ -4,7 +4,7 @@ const { hashPassword } = require("../../utils/password");
 const { HttpError } = require("../../utils/errors");
 const { asyncHandler } = require("../../utils/asyncHandler");
 
-const ROLES = ["admin", "cajero", "barista"];
+const ROLES = ["admin", "cajero", "barista", "cajero_barista"];
 
 const createSchema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio"),
