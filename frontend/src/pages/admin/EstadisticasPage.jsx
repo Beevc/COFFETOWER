@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Loader2, TrendingUp, TrendingDown, Gift, ArrowUp, ArrowDown } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Gift, ArrowUp, ArrowDown, Wallet, Receipt, Ticket } from "lucide-react";
 import { estadisticasApi } from "../../api/estadisticas";
 import { money } from "../../utils/format";
 import BarChart from "../../components/BarChart";
+import StatCard from "../../components/StatCard";
 
 const PERIODOS = [
   { id: "dia", label: "Hoy" },
@@ -32,7 +33,7 @@ function Metric({ label, value }) {
 function Detalle({ data }) {
   return (
     <>
-      <div className="rounded-xl border border-frappe-border bg-frappe-surface p-4">
+      <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
         <div className="mb-2 text-sm font-semibold text-frappe-text">Por forma de pago</div>
         {data.porMedioPago.length === 0 ? (
           <div className="text-sm text-frappe-textSoft">Sin ventas en este período.</div>
@@ -44,13 +45,13 @@ function Detalle({ data }) {
         ))}
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-frappe-border bg-frappe-surface p-4">
+        <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
           <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-frappe-success"><TrendingUp size={15} /> Más vendidos</div>
           {data.top.length === 0 ? <div className="text-sm text-frappe-textSoft">—</div> : data.top.map((p) => (
             <div key={p.productoId} className="flex justify-between py-1 text-sm"><span className="text-frappe-text">{p.nombre}</span><span className="font-semibold text-frappe-textSoft">{p.cantidad} u.</span></div>
           ))}
         </div>
-        <div className="rounded-xl border border-frappe-border bg-frappe-surface p-4">
+        <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
           <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-frappe-danger"><TrendingDown size={15} /> Menos vendidos</div>
           {data.bottom.length === 0 ? <div className="text-sm text-frappe-textSoft">—</div> : data.bottom.map((p) => (
             <div key={p.productoId} className="flex justify-between py-1 text-sm"><span className="text-frappe-text">{p.nombre}</span><span className="font-semibold text-frappe-textSoft">{p.cantidad} u.</span></div>
@@ -178,15 +179,15 @@ export default function EstadisticasPage() {
         <div className="flex items-center justify-center gap-2 py-16 text-frappe-textSoft"><Loader2 size={18} className="animate-spin" /> Cargando…</div>
       ) : (
         <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-3 gap-2">
-            <Metric label={periodo === "dia" ? "Ventas del día" : periodo === "semana" ? "Ventas semana" : "Ventas mes"} value={money(data.totalVentas)} />
-            <Metric label="N° ventas" value={data.nVentas} />
-            <Metric label="Ticket prom." value={money(data.ticketPromedio)} />
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <StatCard tone="success" icon={Wallet} label={periodo === "dia" ? "Ventas del día" : periodo === "semana" ? "Ventas semana" : "Ventas mes"} value={money(data.totalVentas)} />
+            <StatCard tone="accent" icon={Receipt} label="N° ventas" value={data.nVentas} />
+            <StatCard tone="neutral" icon={Ticket} label="Ticket prom." value={money(data.ticketPromedio)} />
           </div>
 
           {/* Gráfico diario de la semana */}
           {periodo === "semana" && serie && (
-            <div className="rounded-xl border border-frappe-border bg-frappe-surface p-4">
+            <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
               <div className="mb-3 text-sm font-semibold text-frappe-text">Ventas por día (esta semana)</div>
               <BarChart data={serieSemana} formatValue={money} showValues />
             </div>
@@ -194,7 +195,7 @@ export default function EstadisticasPage() {
 
           {/* Comparación de semanas */}
           {periodo === "semana" && comp && (
-            <div className="rounded-xl border border-frappe-border bg-frappe-surface p-4">
+            <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
               <div className="mb-2 text-sm font-semibold text-frappe-text">Comparación de semanas</div>
               <Comparacion comp={comp} unidad="semana" />
               <div className="mt-3"><BarChart data={compSemana} formatValue={money} /></div>
@@ -203,7 +204,7 @@ export default function EstadisticasPage() {
 
           {/* Gráfico diario del mes */}
           {periodo === "mes" && serie && (
-            <div className="rounded-xl border border-frappe-border bg-frappe-surface p-4">
+            <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
               <div className="mb-3 text-sm font-semibold text-frappe-text">Ventas por día (este mes)</div>
               <BarChart data={serieMes} formatValue={money} height={140} />
             </div>
@@ -211,7 +212,7 @@ export default function EstadisticasPage() {
 
           {/* Comparación de meses */}
           {periodo === "mes" && comp && (
-            <div className="rounded-xl border border-frappe-border bg-frappe-surface p-4">
+            <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
               <div className="mb-2 text-sm font-semibold text-frappe-text">Comparación de meses</div>
               <Comparacion comp={comp} unidad="mes" />
               <div className="mt-3"><BarChart data={compMes} formatValue={money} /></div>
