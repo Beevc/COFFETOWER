@@ -41,7 +41,11 @@ const publicPedido = (p) => ({
 });
 
 const ITEMS_SUBQUERY = `
-  (SELECT json_agg(json_build_object('productoId', vi.producto_id, 'nombre', vi.nombre, 'cantidad', vi.cantidad) ORDER BY vi.id)
+  (SELECT json_agg(json_build_object(
+            'productoId', vi.producto_id, 'nombre', vi.nombre, 'cantidad', vi.cantidad,
+            'opciones', (SELECT json_agg(vio.nombre ORDER BY vio.id)
+                           FROM venta_item_opcion vio WHERE vio.venta_item_id = vi.id)
+          ) ORDER BY vi.id)
      FROM venta_item vi WHERE vi.venta_id = v.id) AS items`;
 
 const SELECT_PEDIDO = `

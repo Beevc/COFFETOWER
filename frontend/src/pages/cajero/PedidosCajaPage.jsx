@@ -80,6 +80,7 @@ export default function PedidosCajaPage() {
                 {p.items.map((it, i) => (
                   <span key={i}>
                     <span className="font-bold text-frappe-accentDark">{it.cantidad}×</span> {it.nombre}
+                    {it.opciones && it.opciones.length > 0 ? ` (${it.opciones.join(", ")})` : ""}
                     {i < p.items.length - 1 ? " · " : ""}
                   </span>
                 ))}

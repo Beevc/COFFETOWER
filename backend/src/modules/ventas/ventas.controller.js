@@ -19,6 +19,7 @@ const registrarSchema = z.object({
       z.object({
         productoId: z.number().int().positive(),
         cantidad: z.number().int().positive("La cantidad debe ser mayor a 0"),
+        opciones: z.array(z.number().int().positive()).max(10).optional(), // personalizaciones
       })
     )
     .min(1, "La venta debe tener al menos un producto"),
@@ -76,13 +77,31 @@ const registrar = asyncHandler(async (req, res) => {
     );
     const mapa = new Map(productos.map((p) => [p.id, p]));
 
+    // Cargar las opciones (personalizaciones) referenciadas por los ítems.
+    const opcionIds = [...new Set(items.flatMap((i) => i.opciones || []))];
+    let opcMap = new Map();
+    if (opcionIds.length > 0) {
+      const { rows: ops } = await client.query(
+        `SELECT id, nombre, tipo, precio, insumo_id, cantidad, insumo_origen_id, insumo_reemplazo_id
+           FROM opcion WHERE local_id = $1 AND activo = true AND id = ANY($2::int[])`,
+        [localId, opcionIds]
+      );
+      opcMap = new Map(ops.map((o) => [o.id, o]));
+    }
+
     let grossTotal = 0;
     const lineas = [];
     for (const item of items) {
       const p = mapa.get(item.productoId);
       if (!p) throw new HttpError(400, `Producto ${item.productoId} no existe en el local`);
       if (!p.activo) throw new HttpError(400, `El producto "${p.nombre}" está inactivo`);
-      const subtotal = p.precio * item.cantidad;
+      const opciones = (item.opciones || []).map((oid) => {
+        const o = opcMap.get(oid);
+        if (!o) throw new HttpError(400, "Una de las personalizaciones no es válida");
+        return o;
+      });
+      const extraUnit = opciones.reduce((s, o) => s + Number(o.precio), 0);
+      const subtotal = (p.precio + extraUnit) * item.cantidad;
       grossTotal += subtotal;
       lineas.push({
         productoId: p.id,
@@ -90,6 +109,7 @@ const registrar = asyncHandler(async (req, res) => {
         precioUnit: p.precio,
         cantidad: item.cantidad,
         subtotal,
+        opciones, // objetos de opción (con insumo/tipo para inventario)
       });
     }
 
@@ -162,11 +182,18 @@ const registrar = asyncHandler(async (req, res) => {
     const venta = ventaRows[0];
 
     for (const l of lineas) {
-      await client.query(
+      const { rows: viRows } = await client.query(
         `INSERT INTO venta_item (venta_id, producto_id, nombre, precio_unit, cantidad, subtotal)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
         [venta.id, l.productoId, l.nombre, l.precioUnit, l.cantidad, l.subtotal]
       );
+      const viId = viRows[0].id;
+      for (const o of l.opciones) {
+        await client.query(
+          `INSERT INTO venta_item_opcion (venta_item_id, opcion_id, nombre, precio) VALUES ($1,$2,$3,$4)`,
+          [viId, o.id, o.nombre, Number(o.precio)]
+        );
+      }
     }
 
     // --- Fase 3: descontar insumos según la receta de cada producto ---
@@ -181,11 +208,25 @@ const registrar = asyncHandler(async (req, res) => {
     // La cantidad de la receta está en su unidad de receta -> se multiplica por
     // factor_receta para obtener la unidad real del insumo (la del stock).
     const consumoPorInsumo = new Map();
+    const addConsumo = (insumoId, q) => consumoPorInsumo.set(insumoId, (consumoPorInsumo.get(insumoId) || 0) + q);
     for (const l of lineas) {
+      // Sustituciones de esta línea: insumo origen -> insumo reemplazo.
+      const subs = new Map();
+      for (const o of l.opciones) {
+        if (o.tipo === "sustitucion" && o.insumo_origen_id && o.insumo_reemplazo_id) {
+          subs.set(o.insumo_origen_id, o.insumo_reemplazo_id);
+        }
+      }
       for (const r of recetas) {
         if (r.producto_id !== l.productoId) continue;
-        const total = Number(r.cantidad) * Number(r.factor_receta) * l.cantidad;
-        consumoPorInsumo.set(r.insumo_id, (consumoPorInsumo.get(r.insumo_id) || 0) + total);
+        const destino = subs.get(r.insumo_id) || r.insumo_id; // si hay sustitución, va al reemplazo
+        addConsumo(destino, Number(r.cantidad) * Number(r.factor_receta) * l.cantidad);
+      }
+      // Extras: consumen su insumo (cantidad en unidad real) por cada unidad del producto.
+      for (const o of l.opciones) {
+        if (o.tipo === "extra" && o.insumo_id && o.cantidad) {
+          addConsumo(o.insumo_id, Number(o.cantidad) * l.cantidad);
+        }
       }
     }
 
@@ -240,7 +281,17 @@ const registrar = asyncHandler(async (req, res) => {
 
     await client.query("COMMIT");
     res.status(201).json({
-      venta: { ...publicVenta(venta), items: lineas },
+      venta: {
+        ...publicVenta(venta),
+        items: lineas.map((l) => ({
+          productoId: l.productoId,
+          nombre: l.nombre,
+          precioUnit: l.precioUnit,
+          cantidad: l.cantidad,
+          subtotal: l.subtotal,
+          opciones: l.opciones.map((o) => ({ nombre: o.nombre, precio: Number(o.precio) })),
+        })),
+      },
       alertas,
       descuento,
       beneficio,

@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Coffee, LogOut, Users, Package, Wallet, Boxes, BookOpen, BarChart3, Tag, Star, Gift, Layers, Landmark, Banknote, ClipboardList } from "lucide-react";
+import { Coffee, LogOut, Users, Package, Wallet, Boxes, BookOpen, BarChart3, Tag, Star, Gift, Layers, Landmark, Banknote, ClipboardList, SlidersHorizontal } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
   { to: "/admin/insumos", label: "Insumos", icon: Boxes },
   { to: "/admin/inventario", label: "Inventario", icon: ClipboardList },
   { to: "/admin/recetas", label: "Recetas", icon: BookOpen },
+  { to: "/admin/opciones", label: "Opciones", icon: SlidersHorizontal },
   { to: "/admin/promociones", label: "Promociones", icon: Tag },
   { to: "/admin/fidelidad", label: "Fidelidad", icon: Star },
   { to: "/admin/convenio", label: "Convenio", icon: Gift },

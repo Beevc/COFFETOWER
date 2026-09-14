@@ -42,6 +42,9 @@ export default function Comprobante({ venta, onNueva, onAnular }) {
           <div className="text-xs text-frappe-textSoft">
             {i.cantidad} x {money(i.precioUnit)}
           </div>
+          {i.opciones && i.opciones.length > 0 && (
+            <div className="text-xs text-frappe-accentDark">+ {i.opciones.map((o) => o.nombre).join(", ")}</div>
+          )}
         </div>
       ))}
 

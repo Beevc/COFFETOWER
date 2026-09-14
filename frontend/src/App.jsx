@@ -10,6 +10,7 @@ import VentasPage from "./pages/admin/VentasPage";
 import InsumosPage from "./pages/admin/InsumosPage";
 import InventarioPage from "./pages/admin/InventarioPage";
 import RecetasPage from "./pages/admin/RecetasPage";
+import OpcionesPage from "./pages/admin/OpcionesPage";
 import EstadisticasPage from "./pages/admin/EstadisticasPage";
 import FinanzasPage from "./pages/admin/FinanzasPage";
 import AdminCajaPage from "./pages/admin/AdminCajaPage";
@@ -71,6 +72,7 @@ export default function App() {
             <Route path="insumos" element={<InsumosPage />} />
             <Route path="inventario" element={<InventarioPage />} />
             <Route path="recetas" element={<RecetasPage />} />
+            <Route path="opciones" element={<OpcionesPage />} />
             <Route path="promociones" element={<PromocionesPage />} />
             <Route path="fidelidad" element={<FidelidadPage />} />
             <Route path="convenio" element={<ConvenioPage />} />

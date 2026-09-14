@@ -134,6 +134,9 @@ export default function BaristaPage() {
               <div className="text-sm text-frappe-text">
                 <span className="font-bold text-frappe-accentDark">{it.cantidad}×</span> {it.nombre}
               </div>
+              {it.opciones && it.opciones.length > 0 && (
+                <div className="text-xs font-medium text-frappe-accentDark">+ {it.opciones.join(", ")}</div>
+              )}
               <VerReceta productoId={it.productoId} />
             </div>
           ))}
