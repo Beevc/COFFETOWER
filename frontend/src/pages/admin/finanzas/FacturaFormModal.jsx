@@ -4,7 +4,7 @@ import Modal from "../../../components/Modal";
 import { finanzasApi } from "../../../api/finanzas";
 import { insumosApi } from "../../../api/insumos";
 import { money } from "../../../utils/format";
-import { CATEGORIAS, MEDIOS, hoyISO } from "./constants";
+import { CATEGORIAS, MEDIOS, FRECUENCIAS, hoyISO, construirCuotas } from "./constants";
 
 const inputCls =
   "w-full rounded-lg border border-frappe-border bg-frappe-bg px-3 py-2.5 text-sm text-frappe-text outline-none focus:border-frappe-accent";
@@ -26,8 +26,20 @@ export default function FacturaFormModal({ proveedores, onClose, onSaved }) {
   const [montoPago, setMontoPago] = useState("");
   const [medioPago, setMedioPago] = useState("efectivo");
 
+  // Plan de cuotas
+  const [enCuotas, setEnCuotas] = useState(false);
+  const [nCuotas, setNCuotas] = useState(3);
+  const [primeraCuota, setPrimeraCuota] = useState(hoyISO());
+  const [frecuencia, setFrecuencia] = useState("mensual");
+
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
+
+  const montoNum = Math.trunc(Number(montoTotal)) || 0;
+  const previewCuotas =
+    enCuotas && montoNum > 0 && nCuotas >= 1 && primeraCuota
+      ? construirCuotas(montoNum, nCuotas, primeraCuota, frecuencia)
+      : [];
 
   useEffect(() => {
     insumosApi.list({ activo: true }).then(setInsumos).catch(() => {});
@@ -61,6 +73,11 @@ export default function FacturaFormModal({ proveedores, onClose, onSaved }) {
       montoTotal: monto,
     };
     if (itemsLimpios.length > 0) data.items = itemsLimpios;
+    if (enCuotas) {
+      if (!(nCuotas >= 1)) { setError("El N° de cuotas debe ser al menos 1"); return; }
+      if (!primeraCuota) { setError("Elige la fecha de la primera cuota"); return; }
+      data.cuotas = construirCuotas(monto, nCuotas, primeraCuota, frecuencia);
+    }
     if (pagarAhora) {
       const mp = Math.trunc(Number(montoPago) || monto);
       if (!(mp > 0)) { setError("El monto del pago debe ser mayor a 0"); return; }
@@ -173,7 +190,50 @@ export default function FacturaFormModal({ proveedores, onClose, onSaved }) {
           )}
         </div>
 
-        {/* Pago inicial */}
+        {/* Plan de cuotas */}
+        <div className="mb-3 rounded-lg border border-frappe-border bg-frappe-bg/50 p-3">
+          <label className="flex items-center gap-2 text-sm font-semibold text-frappe-text">
+            <input type="checkbox" checked={enCuotas} onChange={(e) => { setEnCuotas(e.target.checked); if (e.target.checked) setPagarAhora(false); }} />
+            Pagar en cuotas
+          </label>
+          {enCuotas && (
+            <>
+              <div className="mt-2 grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>N° de cuotas</label>
+                  <input type="number" min="1" max="60" step="1" inputMode="numeric" className={inputCls}
+                    value={nCuotas} onChange={(e) => setNCuotas(Math.max(1, Math.trunc(Number(e.target.value)) || 1))} />
+                </div>
+                <div>
+                  <label className={labelCls}>Frecuencia</label>
+                  <select className={inputCls} value={frecuencia} onChange={(e) => setFrecuencia(e.target.value)}>
+                    {FRECUENCIAS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="mt-3">
+                <label className={labelCls}>Fecha de la 1ª cuota</label>
+                <input type="date" className={`${inputCls} block min-w-0 appearance-none`} value={primeraCuota} onChange={(e) => setPrimeraCuota(e.target.value)} />
+              </div>
+
+              {previewCuotas.length > 0 ? (
+                <div className="mt-3 rounded-lg border border-frappe-border bg-frappe-surface">
+                  {previewCuotas.map((c, i) => (
+                    <div key={i} className={`flex items-center justify-between px-3 py-1.5 text-sm ${i > 0 ? "border-t border-frappe-border" : ""}`}>
+                      <span className="text-frappe-textSoft">Cuota {i + 1} · vence {c.fechaVencimiento}</span>
+                      <span className="font-semibold text-frappe-text">{money(c.monto)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-frappe-textSoft">Ingresa el monto total arriba para ver el detalle de las cuotas.</p>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Pago inicial (no se combina con cuotas) */}
+        {!enCuotas && (
         <div className="mb-4 rounded-lg border border-frappe-border bg-frappe-bg/50 p-3">
           <label className="flex items-center gap-2 text-sm font-semibold text-frappe-text">
             <input type="checkbox" checked={pagarAhora} onChange={(e) => { setPagarAhora(e.target.checked); if (e.target.checked && !montoPago) setMontoPago(montoTotal); }} />
@@ -194,6 +254,7 @@ export default function FacturaFormModal({ proveedores, onClose, onSaved }) {
             </div>
           )}
         </div>
+        )}
 
         <div className="flex gap-2">
           <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-frappe-border py-2.5 text-sm font-semibold text-frappe-text hover:bg-frappe-bg">Cancelar</button>

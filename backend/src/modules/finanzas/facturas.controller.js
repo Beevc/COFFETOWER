@@ -12,6 +12,12 @@ const itemSchema = z.object({
   cantidad: z.number().positive("La cantidad debe ser mayor a 0"),
 });
 
+const cuotaSchema = z.object({
+  monto: z.number().int("El monto debe ser entero").min(0, "No puede ser negativo"),
+  fechaVencimiento: fecha,
+});
+const cuotasSchema = z.array(cuotaSchema).min(1).max(60);
+
 const createSchema = z.object({
   proveedorId: z.number().int().positive().nullable().optional(),
   numero: z.string().trim().max(60).optional(),
@@ -21,6 +27,8 @@ const createSchema = z.object({
   fechaVencimiento: fecha.optional(),
   montoTotal: z.number().int("El monto debe ser entero").min(0, "No puede ser negativo"),
   items: z.array(itemSchema).max(50).optional(),
+  // Plan de cuotas opcional (la suma debe coincidir con el monto total).
+  cuotas: cuotasSchema.optional(),
   // Pago inicial opcional (para marcarla pagada al crear).
   pagoInicial: z
     .object({
@@ -30,6 +38,14 @@ const createSchema = z.object({
       nota: z.string().trim().max(200).optional(),
     })
     .optional(),
+});
+
+const generarCuotasSchema = z.object({ cuotas: cuotasSchema });
+
+const pagarCuotaSchema = z.object({
+  medioPago: z.enum(MEDIOS, { message: "Medio de pago inválido" }),
+  fecha: fecha.optional(),
+  nota: z.string().trim().max(200).optional(),
 });
 
 const updateSchema = z
@@ -58,11 +74,21 @@ function estadoDe(montoTotal, pagado) {
   return "parcial";
 }
 
+// Estado de una cuota individual.
+function estadoCuota(monto, pagado, fechaVenc, hoy) {
+  if (pagado >= monto) return "pagada";
+  if (fechaVenc && String(fechaVenc).slice(0, 10) < hoy) return "vencida";
+  return "pendiente";
+}
+
 const publicFactura = (f) => {
   const montoTotal = Number(f.monto_total);
   const pagado = Number(f.pagado || 0);
   const saldo = Math.max(0, montoTotal - pagado);
   const hoy = new Date().toISOString().slice(0, 10);
+  const cuotasTotal = Number(f.cuotas_total || 0);
+  // Con plan de cuotas, el vencimiento relevante es el de la próxima cuota impaga.
+  const vencRef = cuotasTotal > 0 ? f.proxima_cuota_venc : f.fecha_vencimiento;
   return {
     id: f.id,
     proveedorId: f.proveedor_id,
@@ -76,16 +102,48 @@ const publicFactura = (f) => {
     pagado,
     saldo,
     estado: estadoDe(montoTotal, pagado),
-    vencida: !!(f.fecha_vencimiento && saldo > 0 && String(f.fecha_vencimiento).slice(0, 10) < hoy),
+    vencida: !!(vencRef && saldo > 0 && String(vencRef).slice(0, 10) < hoy),
+    cuotasTotal,
+    cuotasPagadas: Number(f.cuotas_pagadas || 0),
+    proximaCuotaVenc: cuotasTotal > 0 ? f.proxima_cuota_venc : null,
     createdAt: f.created_at,
   };
 };
 
 const SELECT_FACTURA = `
   SELECT f.*, pr.nombre AS proveedor_nombre,
-         COALESCE((SELECT SUM(monto) FROM pago WHERE factura_id = f.id), 0) AS pagado
+         COALESCE((SELECT SUM(monto) FROM pago WHERE factura_id = f.id), 0) AS pagado,
+         (SELECT COUNT(*) FROM cuota c WHERE c.factura_id = f.id) AS cuotas_total,
+         (SELECT COUNT(*) FROM cuota c WHERE c.factura_id = f.id
+            AND COALESCE((SELECT SUM(p.monto) FROM pago p WHERE p.cuota_id = c.id), 0) >= c.monto) AS cuotas_pagadas,
+         (SELECT MIN(c.fecha_vencimiento) FROM cuota c WHERE c.factura_id = f.id
+            AND COALESCE((SELECT SUM(p.monto) FROM pago p WHERE p.cuota_id = c.id), 0) < c.monto) AS proxima_cuota_venc
     FROM factura f
     LEFT JOIN proveedor pr ON pr.id = f.proveedor_id`;
+
+// Cuotas de una factura con lo pagado y el estado de cada una.
+async function cuotasDeFactura(facturaId, runner = query) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const { rows } = await runner(
+    `SELECT c.id, c.numero, c.monto, c.fecha_vencimiento,
+            COALESCE((SELECT SUM(p.monto) FROM pago p WHERE p.cuota_id = c.id), 0) AS pagado
+       FROM cuota c WHERE c.factura_id = $1 ORDER BY c.numero`,
+    [facturaId]
+  );
+  return rows.map((c) => {
+    const monto = Number(c.monto);
+    const pagado = Number(c.pagado);
+    return {
+      id: c.id,
+      numero: c.numero,
+      monto,
+      pagado,
+      saldo: Math.max(0, monto - pagado),
+      fechaVencimiento: c.fecha_vencimiento,
+      estado: estadoCuota(monto, pagado, c.fecha_vencimiento, hoy),
+    };
+  });
+}
 
 // GET /api/finanzas/facturas?estado=&proveedorId=&categoria=&desde=&hasta=
 const list = asyncHandler(async (req, res) => {
@@ -117,15 +175,17 @@ const getOne = asyncHandler(async (req, res) => {
     [id]
   );
   const { rows: pagos } = await query(
-    `SELECT id, fecha, monto, medio_pago AS "medioPago", nota, created_at AS "createdAt"
+    `SELECT id, fecha, monto, medio_pago AS "medioPago", nota, cuota_id AS "cuotaId", created_at AS "createdAt"
        FROM pago WHERE factura_id = $1 ORDER BY fecha ASC, id ASC`,
     [id]
   );
+  const cuotas = await cuotasDeFactura(id);
   res.json({
     factura: {
       ...publicFactura(factura),
       items: items.map((it) => ({ ...it, cantidad: Number(it.cantidad) })),
       pagos: pagos.map((p) => ({ ...p, monto: Number(p.monto) })),
+      cuotas,
     },
   });
 });
@@ -140,8 +200,13 @@ const create = asyncHandler(async (req, res) => {
   const localId = req.user.localId;
   const {
     proveedorId = null, numero, categoria, descripcion,
-    fechaEmision, fechaVencimiento, montoTotal, items = [], pagoInicial,
+    fechaEmision, fechaVencimiento, montoTotal, items = [], cuotas, pagoInicial,
   } = req.body;
+
+  if (cuotas && cuotas.length > 0) {
+    const suma = cuotas.reduce((a, c) => a + c.monto, 0);
+    if (suma !== montoTotal) throw new HttpError(400, `Las cuotas suman $${suma} y el total es $${montoTotal}`);
+  }
 
   const client = await pool.connect();
   try {
@@ -179,6 +244,16 @@ const create = asyncHandler(async (req, res) => {
         await client.query(
           "UPDATE insumo SET stock_actual = stock_actual + $1, updated_at = now() WHERE id = $2",
           [it.cantidad, it.insumoId]);
+      }
+    }
+
+    // Plan de cuotas opcional.
+    if (cuotas && cuotas.length > 0) {
+      for (let i = 0; i < cuotas.length; i++) {
+        await client.query(
+          `INSERT INTO cuota (local_id, factura_id, numero, monto, fecha_vencimiento)
+           VALUES ($1,$2,$3,$4,$5)`,
+          [localId, facturaId, i + 1, cuotas[i].monto, cuotas[i].fechaVencimiento]);
       }
     }
 
@@ -288,7 +363,83 @@ const removePago = asyncHandler(async (req, res) => {
   res.json({ ok: true });
 });
 
+// POST /api/finanzas/facturas/:id/cuotas  (crea o reemplaza el plan de cuotas)
+const generarCuotas = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  const localId = req.user.localId;
+  const { cuotas } = req.body;
+
+  const actual = await facturaDelLocal(id, localId);
+  if (!actual) throw new HttpError(404, "Factura no encontrada");
+
+  const suma = cuotas.reduce((a, c) => a + c.monto, 0);
+  if (suma !== Number(actual.monto_total)) {
+    throw new HttpError(400, `Las cuotas suman $${suma} y el total es $${actual.monto_total}`);
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    // No se puede rehacer el plan si ya hay cuotas con pagos aplicados.
+    const { rows: conPago } = await client.query(
+      `SELECT 1 FROM cuota c
+        WHERE c.factura_id = $1
+          AND EXISTS (SELECT 1 FROM pago p WHERE p.cuota_id = c.id) LIMIT 1`,
+      [id]);
+    if (conPago[0]) throw new HttpError(400, "Ya hay cuotas con pagos; no se puede rehacer el plan");
+
+    await client.query("DELETE FROM cuota WHERE factura_id = $1", [id]);
+    for (let i = 0; i < cuotas.length; i++) {
+      await client.query(
+        `INSERT INTO cuota (local_id, factura_id, numero, monto, fecha_vencimiento)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [localId, id, i + 1, cuotas[i].monto, cuotas[i].fechaVencimiento]);
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const factura = await facturaDelLocal(id, localId);
+  const cuotasOut = await cuotasDeFactura(id);
+  res.status(201).json({ factura: { ...publicFactura(factura), cuotas: cuotasOut } });
+});
+
+// POST /api/finanzas/facturas/:id/cuotas/:cuotaId/pagar  (registra el pago del saldo de la cuota)
+const pagarCuota = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  const cuotaId = Number(req.params.cuotaId);
+  const localId = req.user.localId;
+  const { medioPago, fecha: fechaPago, nota } = req.body;
+
+  const actual = await facturaDelLocal(id, localId);
+  if (!actual) throw new HttpError(404, "Factura no encontrada");
+
+  const { rows: cRows } = await query(
+    `SELECT c.monto,
+            COALESCE((SELECT SUM(p.monto) FROM pago p WHERE p.cuota_id = c.id), 0) AS pagado
+       FROM cuota c WHERE c.id = $1 AND c.factura_id = $2 AND c.local_id = $3`,
+    [cuotaId, id, localId]);
+  const cuota = cRows[0];
+  if (!cuota) throw new HttpError(404, "Cuota no encontrada");
+  const saldoCuota = Number(cuota.monto) - Number(cuota.pagado);
+  if (saldoCuota <= 0) throw new HttpError(400, "La cuota ya está pagada");
+
+  await query(
+    `INSERT INTO pago (local_id, factura_id, cuota_id, fecha, monto, medio_pago, nota, creado_por_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [localId, id, cuotaId, fechaPago || new Date().toISOString().slice(0, 10),
+     saldoCuota, medioPago, nota || null, req.user.id]);
+
+  const factura = await facturaDelLocal(id, localId);
+  const cuotasOut = await cuotasDeFactura(id);
+  res.status(201).json({ factura: { ...publicFactura(factura), cuotas: cuotasOut } });
+});
+
 module.exports = {
-  list, getOne, create, update, remove, addPago, removePago,
-  createSchema, updateSchema, pagoSchema,
+  list, getOne, create, update, remove, addPago, removePago, generarCuotas, pagarCuota,
+  createSchema, updateSchema, pagoSchema, generarCuotasSchema, pagarCuotaSchema,
 };

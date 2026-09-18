@@ -33,4 +33,8 @@ router.delete("/facturas/:id", facturas.remove);
 router.post("/facturas/:id/pagos", validateBody(facturas.pagoSchema), facturas.addPago);
 router.delete("/pagos/:id", facturas.removePago);
 
+// Cuotas (plan de pagos programados).
+router.post("/facturas/:id/cuotas", validateBody(facturas.generarCuotasSchema), facturas.generarCuotas);
+router.post("/facturas/:id/cuotas/:cuotaId/pagar", validateBody(facturas.pagarCuotaSchema), facturas.pagarCuota);
+
 module.exports = router;

@@ -83,7 +83,9 @@ export default function FacturasView({ proveedores, onData }) {
                 </div>
                 <div className="truncate text-xs text-frappe-textSoft">
                   {catLabel(f.categoria)}{f.numero ? ` · N° ${f.numero}` : ""}
-                  {f.fechaVencimiento ? ` · vence ${String(f.fechaVencimiento).slice(0, 10)}` : ""}
+                  {f.cuotasTotal > 0
+                    ? ` · cuotas ${f.cuotasPagadas}/${f.cuotasTotal}${f.proximaCuotaVenc ? ` · próx. ${String(f.proximaCuotaVenc).slice(0, 10)}` : ""}`
+                    : f.fechaVencimiento ? ` · vence ${String(f.fechaVencimiento).slice(0, 10)}` : ""}
                 </div>
               </div>
               <div className="text-right">

@@ -18,4 +18,8 @@ export const finanzasApi = {
 
   agregarPago: (id, data) => api.post(`/finanzas/facturas/${id}/pagos`, data).then((r) => r.data.factura),
   eliminarPago: (id) => api.delete(`/finanzas/pagos/${id}`).then((r) => r.data),
+
+  generarCuotas: (id, cuotas) => api.post(`/finanzas/facturas/${id}/cuotas`, { cuotas }).then((r) => r.data.factura),
+  pagarCuota: (id, cuotaId, data) =>
+    api.post(`/finanzas/facturas/${id}/cuotas/${cuotaId}/pagar`, data).then((r) => r.data.factura),
 };

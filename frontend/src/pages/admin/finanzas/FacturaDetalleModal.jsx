@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { Loader2, Trash2, Plus, CalendarClock } from "lucide-react";
+import { Loader2, Trash2, Plus, CalendarClock, CalendarDays } from "lucide-react";
 import Modal from "../../../components/Modal";
 import { finanzasApi } from "../../../api/finanzas";
 import { money } from "../../../utils/format";
-import { MEDIOS, catLabel, medioLabel, ESTADO_FACTURA, hoyISO } from "./constants";
+import {
+  MEDIOS, FRECUENCIAS, catLabel, medioLabel,
+  ESTADO_FACTURA, ESTADO_CUOTA, hoyISO, construirCuotas,
+} from "./constants";
 
 const inputCls =
   "w-full rounded-lg border border-frappe-border bg-frappe-bg px-2.5 py-2 text-sm text-frappe-text outline-none focus:border-frappe-accent";
@@ -26,6 +29,15 @@ export default function FacturaDetalleModal({ facturaId, onClose, onChanged }) {
   const [medioPago, setMedioPago] = useState("efectivo");
   const [fecha, setFecha] = useState(hoyISO());
   const [guardando, setGuardando] = useState(false);
+  // Cuotas
+  const [medioCuota, setMedioCuota] = useState("efectivo");
+  const [pagandoCuota, setPagandoCuota] = useState(null);
+  // Crear plan de cuotas (para facturas sin plan)
+  const [mostrarPlan, setMostrarPlan] = useState(false);
+  const [nCuotas, setNCuotas] = useState(3);
+  const [primeraCuota, setPrimeraCuota] = useState(hoyISO());
+  const [frecuencia, setFrecuencia] = useState("mensual");
+  const [guardandoPlan, setGuardandoPlan] = useState(false);
 
   const cargar = async () => {
     try {
@@ -54,6 +66,39 @@ export default function FacturaDetalleModal({ facturaId, onClose, onChanged }) {
       setError(err.response?.data?.error || "No se pudo registrar el pago");
     } finally {
       setGuardando(false);
+    }
+  };
+
+  const pagarCuota = async (cuotaId) => {
+    setError("");
+    setPagandoCuota(cuotaId);
+    try {
+      await finanzasApi.pagarCuota(facturaId, cuotaId, { medioPago: medioCuota, fecha: hoyISO() });
+      await cargar();
+      onChanged?.();
+    } catch (err) {
+      setError(err.response?.data?.error || "No se pudo pagar la cuota");
+    } finally {
+      setPagandoCuota(null);
+    }
+  };
+
+  const crearPlan = async () => {
+    const total = Number(f.saldo) + Number(f.pagado); // = montoTotal
+    if (!(nCuotas >= 1)) { setError("El N° de cuotas debe ser al menos 1"); return; }
+    if (!primeraCuota) { setError("Elige la fecha de la primera cuota"); return; }
+    setError("");
+    setGuardandoPlan(true);
+    try {
+      const cuotas = construirCuotas(Math.trunc(total), nCuotas, primeraCuota, frecuencia);
+      await finanzasApi.generarCuotas(facturaId, cuotas);
+      setMostrarPlan(false);
+      await cargar();
+      onChanged?.();
+    } catch (err) {
+      setError(err.response?.data?.error || "No se pudo crear el plan de cuotas");
+    } finally {
+      setGuardandoPlan(false);
     }
   };
 
@@ -116,6 +161,88 @@ export default function FacturaDetalleModal({ facturaId, onClose, onChanged }) {
             </div>
           )}
 
+          {/* Cuotas */}
+          {f.cuotas?.length > 0 && (
+            <div className="mb-3">
+              <div className="mb-1 flex items-center justify-between">
+                <div className="text-xs font-semibold text-frappe-textSoft">
+                  Plan de cuotas ({f.cuotasPagadas}/{f.cuotasTotal} pagadas)
+                </div>
+                <select className="rounded-lg border border-frappe-border bg-frappe-bg px-2 py-1 text-xs text-frappe-text outline-none focus:border-frappe-accent"
+                  value={medioCuota} onChange={(e) => setMedioCuota(e.target.value)}>
+                  {MEDIOS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </select>
+              </div>
+              <div className="rounded-lg border border-frappe-border bg-frappe-surface">
+                {f.cuotas.map((c, i) => (
+                  <div key={c.id} className={`flex items-center gap-2 px-3 py-2 text-sm ${i > 0 ? "border-t border-frappe-border" : ""}`}>
+                    <span className="w-6 shrink-0 font-semibold text-frappe-text">#{c.numero}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-frappe-text">{money(c.monto)}</div>
+                      <div className="text-xs text-frappe-textSoft">vence {String(c.fechaVencimiento).slice(0, 10)}</div>
+                    </div>
+                    {c.estado === "pagada" ? (
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${ESTADO_CUOTA.pagada.cls}`}>{ESTADO_CUOTA.pagada.label}</span>
+                    ) : (
+                      <button onClick={() => pagarCuota(c.id)} disabled={pagandoCuota === c.id}
+                        className={`flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-60 ${c.estado === "vencida" ? "bg-frappe-danger hover:opacity-90" : "bg-frappe-accent hover:bg-frappe-accentDark"}`}>
+                        {pagandoCuota === c.id ? <Loader2 size={12} className="animate-spin" /> : null}
+                        Pagar{c.estado === "vencida" ? " (vencida)" : ""}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Crear plan de cuotas (si no tiene) */}
+          {f.cuotas?.length === 0 && f.saldo > 0 && (
+            <div className="mb-3">
+              {!mostrarPlan ? (
+                <button onClick={() => setMostrarPlan(true)}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-frappe-border py-2 text-sm font-medium text-frappe-textSoft hover:border-frappe-accent hover:text-frappe-accentDark">
+                  <CalendarDays size={15} /> Dividir en cuotas
+                </button>
+              ) : (
+                <div className="rounded-lg border border-frappe-border bg-frappe-bg/50 p-3">
+                  <div className="mb-2 text-sm font-semibold text-frappe-text">Nuevo plan de cuotas</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="mb-1 block text-xs text-frappe-textSoft">N° de cuotas</label>
+                      <input type="number" min="1" max="60" step="1" inputMode="numeric" className={inputCls}
+                        value={nCuotas} onChange={(e) => setNCuotas(Math.max(1, Math.trunc(Number(e.target.value)) || 1))} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-frappe-textSoft">Frecuencia</label>
+                      <select className={inputCls} value={frecuencia} onChange={(e) => setFrecuencia(e.target.value)}>
+                        {FRECUENCIAS.map((fr) => <option key={fr.id} value={fr.id}>{fr.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <label className="mb-1 block text-xs text-frappe-textSoft">Fecha de la 1ª cuota</label>
+                    <input type="date" className={`${inputCls} block min-w-0 appearance-none`} value={primeraCuota} onChange={(e) => setPrimeraCuota(e.target.value)} />
+                  </div>
+                  <div className="mt-3 rounded-lg border border-frappe-border bg-frappe-surface">
+                    {construirCuotas(Math.trunc(Number(f.saldo) + Number(f.pagado)), nCuotas, primeraCuota, frecuencia).map((c, i) => (
+                      <div key={i} className={`flex items-center justify-between px-3 py-1.5 text-sm ${i > 0 ? "border-t border-frappe-border" : ""}`}>
+                        <span className="text-frappe-textSoft">Cuota {i + 1} · vence {c.fechaVencimiento}</span>
+                        <span className="font-semibold text-frappe-text">{money(c.monto)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <button onClick={() => setMostrarPlan(false)} className="flex-1 rounded-lg border border-frappe-border py-2 text-sm font-semibold text-frappe-text hover:bg-frappe-bg">Cancelar</button>
+                    <button onClick={crearPlan} disabled={guardandoPlan} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-frappe-accent py-2 text-sm font-semibold text-white hover:bg-frappe-accentDark disabled:opacity-60">
+                      {guardandoPlan && <Loader2 size={14} className="animate-spin" />} Crear plan
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Pagos */}
           <div className="mb-2 text-xs font-semibold text-frappe-textSoft">Pagos / abonos</div>
           <div className="mb-3 rounded-lg border border-frappe-border bg-frappe-surface">
@@ -129,8 +256,8 @@ export default function FacturaDetalleModal({ facturaId, onClose, onChanged }) {
             )) : <div className="px-3 py-2 text-sm text-frappe-textSoft">Sin pagos aún.</div>}
           </div>
 
-          {/* Nuevo abono */}
-          {f.saldo > 0 && (
+          {/* Nuevo abono (solo cuando no hay plan de cuotas) */}
+          {f.saldo > 0 && !(f.cuotasTotal > 0) && (
             <div className="mb-4 rounded-lg border border-frappe-border bg-frappe-bg/50 p-3">
               <div className="mb-2 text-sm font-semibold text-frappe-text">Registrar pago</div>
               <div className="space-y-2">
