@@ -2,7 +2,7 @@ const { Router } = require("express");
 const {
   verConfig, guardarConfig,
   listPremios, crearPremio, actualizarPremio, eliminarPremio,
-  listClientes, crearCliente, actualizarCliente,
+  listClientes, crearCliente, actualizarCliente, eliminarCliente,
   configSchema, clienteSchema, clienteUpdateSchema, premioSchema, premioUpdateSchema,
 } = require("./fidelidad.controller");
 const { validateBody } = require("../../middleware/validate");
@@ -25,5 +25,7 @@ router.delete("/premios/:id", requireRole("admin"), eliminarPremio);
 router.get("/clientes", listClientes);
 router.post("/clientes", requireRole("admin", "cajero"), validateBody(clienteSchema), crearCliente);
 router.patch("/clientes/:id", requireRole("admin", "cajero"), validateBody(clienteUpdateSchema), actualizarCliente);
+// Eliminar cliente: solo admin.
+router.delete("/clientes/:id", requireRole("admin"), eliminarCliente);
 
 module.exports = router;

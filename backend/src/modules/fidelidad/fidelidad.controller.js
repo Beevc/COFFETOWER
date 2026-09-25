@@ -17,6 +17,7 @@ const clienteSchema = z.object({
 const clienteUpdateSchema = z.object({
   nombre: z.string().trim().min(1).optional(),
   telefono: z.string().trim().max(30).optional().nullable(),
+  comprasContador: z.number().int().min(0, "La racha no puede ser negativa").optional(),
   activo: z.boolean().optional(),
 }).refine((d) => Object.keys(d).length > 0, { message: "Nada para actualizar" });
 
@@ -226,13 +227,14 @@ const actualizarCliente = asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const config = await getConfig(localId);
   const premios = await getPremiosActivos(localId);
-  const { nombre, telefono, activo } = req.body;
+  const { nombre, telefono, comprasContador, activo } = req.body;
   const sets = [];
   const values = [];
   let i = 1;
   const push = (col, val) => { sets.push(`${col} = $${i++}`); values.push(val); };
   if (nombre !== undefined) push("nombre", nombre);
   if (telefono !== undefined) push("telefono", telefono || null);
+  if (comprasContador !== undefined) push("compras_contador", comprasContador);
   if (activo !== undefined) push("activo", activo);
   push("updated_at", new Date());
   values.push(id, localId);
@@ -249,10 +251,19 @@ const actualizarCliente = asyncHandler(async (req, res) => {
   }
 });
 
+const eliminarCliente = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  // La venta usa ON DELETE SET NULL y el canje ON DELETE CASCADE:
+  // el historial de ventas se conserva, solo se desvincula del cliente.
+  const { rowCount } = await query("DELETE FROM cliente WHERE id = $1 AND local_id = $2", [id, req.user.localId]);
+  if (rowCount === 0) throw new HttpError(404, "Cliente no encontrado");
+  res.json({ ok: true });
+});
+
 module.exports = {
   verConfig, guardarConfig,
   listPremios, crearPremio, actualizarPremio, eliminarPremio,
-  listClientes, crearCliente, actualizarCliente,
+  listClientes, crearCliente, actualizarCliente, eliminarCliente,
   configSchema, clienteSchema, clienteUpdateSchema, premioSchema, premioUpdateSchema,
   getConfig, getPremiosActivos,
 };

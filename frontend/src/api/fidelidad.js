@@ -14,4 +14,6 @@ export const fidelidadApi = {
     api.post("/fidelidad/clientes", data).then((r) => r.data.cliente),
   actualizarCliente: (id, data) =>
     api.patch(`/fidelidad/clientes/${id}`, data).then((r) => r.data.cliente),
+  eliminarCliente: (id) =>
+    api.delete(`/fidelidad/clientes/${id}`).then((r) => r.data),
 };

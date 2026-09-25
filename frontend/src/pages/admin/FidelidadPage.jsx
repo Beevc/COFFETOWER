@@ -51,6 +51,65 @@ function ClienteModal({ onClose, onSaved }) {
   );
 }
 
+function ClienteEditModal({ cliente, onClose, onSaved, onDeleted }) {
+  const [nombre, setNombre] = useState(cliente.nombre);
+  const [telefono, setTelefono] = useState(cliente.telefono || "");
+  const [racha, setRacha] = useState(String(cliente.comprasContador ?? 0));
+  const [error, setError] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [borrando, setBorrando] = useState(false);
+
+  const guardar = async (e) => {
+    e.preventDefault();
+    setError(""); setGuardando(true);
+    try {
+      const cli = await fidelidadApi.actualizarCliente(cliente.id, {
+        nombre: nombre.trim(),
+        telefono: telefono.trim() || null,
+        comprasContador: Math.max(0, Math.trunc(Number(racha)) || 0),
+      });
+      onSaved(cli);
+    } catch (err) {
+      setError(err.response?.data?.error || "No se pudo guardar");
+    } finally { setGuardando(false); }
+  };
+
+  const eliminar = async () => {
+    if (!window.confirm(`¿Eliminar a ${cliente.nombre} de fidelización? No se puede deshacer.`)) return;
+    setError(""); setBorrando(true);
+    try {
+      await fidelidadApi.eliminarCliente(cliente.id);
+      onDeleted(cliente.id);
+    } catch (err) {
+      setError(err.response?.data?.error || "No se pudo eliminar");
+      setBorrando(false);
+    }
+  };
+
+  return (
+    <Modal title="Editar cliente" onClose={onClose}>
+      <form onSubmit={guardar}>
+        {error && <div className="mb-3 rounded-lg bg-frappe-dangerSoft px-3 py-2 text-sm font-medium text-frappe-danger">{error}</div>}
+        <label className={labelCls}>Nombre</label>
+        <input className={`${inputCls} mb-3`} value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+        <label className={labelCls}>Teléfono (opcional)</label>
+        <input className={`${inputCls} mb-3`} value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="+56 9 ..." />
+        <label className={labelCls}>Racha (compras acumuladas)</label>
+        <input type="number" min="0" step="1" inputMode="numeric" className={`${inputCls} mb-4`} value={racha} onChange={(e) => setRacha(e.target.value)} />
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-frappe-border py-2.5 text-sm font-semibold text-frappe-text hover:bg-frappe-bg">Cancelar</button>
+          <button type="submit" disabled={guardando} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-frappe-accent py-2.5 text-sm font-semibold text-white hover:bg-frappe-accentDark disabled:opacity-60">
+            {guardando && <Loader2 size={15} className="animate-spin" />} Guardar
+          </button>
+        </div>
+        <button type="button" onClick={eliminar} disabled={borrando} className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-frappe-danger py-2.5 text-sm font-semibold text-frappe-danger hover:bg-frappe-dangerSoft disabled:opacity-60">
+          {borrando ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />} Eliminar cliente
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
 export default function FidelidadPage() {
   const [config, setConfig] = useState(null);
   const [premios, setPremios] = useState([]);
@@ -59,6 +118,7 @@ export default function FidelidadPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [nuevoCli, setNuevoCli] = useState(false);
+  const [editCli, setEditCli] = useState(null);
   // Alta de nivel
   const [compras, setCompras] = useState("");
   const [tipo, setTipo] = useState("gratis");
@@ -207,7 +267,8 @@ export default function FidelidadPage() {
       ) : (
         <div className="overflow-hidden rounded-xl border border-frappe-border bg-frappe-surface">
           {clientes.map((c, i) => (
-            <div key={c.id} className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? "border-t border-frappe-border" : ""}`}>
+            <button key={c.id} onClick={() => setEditCli(c)}
+              className={`flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-frappe-bg ${i > 0 ? "border-t border-frappe-border" : ""}`}>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold text-frappe-text">{c.nombre}</div>
                 <div className="truncate text-xs text-frappe-textSoft">{c.telefono || "sin teléfono"}</div>
@@ -222,12 +283,20 @@ export default function FidelidadPage() {
                   <span className="text-xs text-frappe-textSoft">faltan {c.faltan} para {premioTexto(c.proximoPremio)}</span>
                 ) : null}
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}
 
       {nuevoCli && <ClienteModal onClose={() => setNuevoCli(false)} onSaved={() => { setNuevoCli(false); cargarClientes(q.trim()); }} />}
+      {editCli && (
+        <ClienteEditModal
+          cliente={editCli}
+          onClose={() => setEditCli(null)}
+          onSaved={() => { setEditCli(null); cargarClientes(q.trim()); }}
+          onDeleted={() => { setEditCli(null); cargarClientes(q.trim()); }}
+        />
+      )}
     </div>
   );
 }
