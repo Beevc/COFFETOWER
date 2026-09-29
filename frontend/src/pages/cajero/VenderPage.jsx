@@ -120,19 +120,27 @@ export default function VenderPage() {
   const total = cart.reduce((s, i) => s + perUnit(i) * i.cantidad, 0);
 
   // --- Vista previa de descuentos ---
+  // Cantidad total por producto: los packs cuentan todas las unidades del mismo
+  // producto aunque estén en líneas distintas (p. ej. una con proteína y otra sin).
+  const qtyPorProducto = {};
+  for (const i of cart) qtyPorProducto[i.id] = (qtyPorProducto[i.id] || 0) + i.cantidad;
   let promoDescuento = 0;
+  const packHecho = {};
   for (const i of cart) {
     const promo = promos[i.id];
     if (!promo) continue;
     const subtotal = perUnit(i) * i.cantidad;
-    let d;
     if (promo.tipo === "pack") {
-      const packs = Math.floor(i.cantidad / promo.packCantidad);
-      d = Math.max(0, packs * (promo.packCantidad * i.precio - promo.packPrecio));
+      if (packHecho[i.id]) continue; // una sola vez por producto
+      packHecho[i.id] = true;
+      const q = qtyPorProducto[i.id];
+      const packs = Math.floor(q / promo.packCantidad);
+      const d = Math.max(0, packs * (promo.packCantidad * i.precio - promo.packPrecio));
+      promoDescuento += Math.min(d, i.precio * q);
     } else {
-      d = promo.tipo === "porcentaje" ? Math.round((subtotal * promo.valor) / 100) : Math.round(promo.valor * i.cantidad);
+      const d = promo.tipo === "porcentaje" ? Math.round((subtotal * promo.valor) / 100) : Math.round(promo.valor * i.cantidad);
+      promoDescuento += Math.min(d, subtotal);
     }
-    promoDescuento += Math.min(d, subtotal);
   }
   let fidDescuento = 0, beneficioPreview = null, regaloPreview = null;
   if (cliente && cliente.premioEnProximaCompra && cliente.proximoPremio && cart.length > 0) {

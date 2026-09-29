@@ -117,23 +117,31 @@ const registrar = asyncHandler(async (req, res) => {
 
     // --- Promociones vigentes por producto (descuento automático) ---
     const promos = await promosVigentes(runner, localId, ids);
+    // Cantidad total por producto (los packs cuentan todas las unidades del
+    // mismo producto aunque estén en líneas distintas por personalización).
+    const qtyPorProducto = new Map();
+    for (const l of lineas) qtyPorProducto.set(l.productoId, (qtyPorProducto.get(l.productoId) || 0) + l.cantidad);
     let promoDescuento = 0;
+    const packHecho = new Set();
     for (const l of lineas) {
       const promo = promos.get(l.productoId);
       if (!promo) continue;
-      let d;
       if (promo.tipo === "pack") {
-        // Nx precio: cada N unidades se cobran packPrecio (el resto va normal).
-        const packs = Math.floor(l.cantidad / promo.packCantidad);
+        // Nx precio: se aplica una sola vez por producto sobre la cantidad total.
+        if (packHecho.has(l.productoId)) continue;
+        packHecho.add(l.productoId);
+        const q = qtyPorProducto.get(l.productoId);
+        const packs = Math.floor(q / promo.packCantidad);
         const ahorroPorPack = promo.packCantidad * l.precioUnit - promo.packPrecio;
-        d = Math.max(0, packs * ahorroPorPack);
+        const d = Math.min(Math.max(0, packs * ahorroPorPack), l.precioUnit * q);
+        promoDescuento += d;
       } else {
-        d = promo.tipo === "porcentaje"
+        let d = promo.tipo === "porcentaje"
           ? Math.round((l.subtotal * promo.valor) / 100)
           : Math.round(promo.valor * l.cantidad); // 'monto' = descuento por unidad
+        d = Math.min(d, l.subtotal);
+        promoDescuento += d;
       }
-      d = Math.min(d, l.subtotal);
-      promoDescuento += d;
     }
 
     // --- Fidelidad por niveles: al llegar a un nivel se aplica su premio ---
