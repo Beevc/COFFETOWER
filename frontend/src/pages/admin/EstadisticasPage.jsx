@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
-import { Loader2, TrendingUp, TrendingDown, Gift, ArrowUp, ArrowDown, Wallet, Receipt, Ticket } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Gift, ArrowUp, ArrowDown, Wallet, Receipt, Ticket, ChevronLeft, ChevronRight } from "lucide-react";
 import { estadisticasApi } from "../../api/estadisticas";
 import { money } from "../../utils/format";
 import BarChart from "../../components/BarChart";
 import StatCard from "../../components/StatCard";
 
 const PERIODOS = [
-  { id: "dia", label: "Hoy" },
-  { id: "semana", label: "Esta semana" },
-  { id: "mes", label: "Este mes" },
+  { id: "dia", label: "Día" },
+  { id: "semana", label: "Semana" },
+  { id: "mes", label: "Mes" },
 ];
 const MEDIO_LABEL = { efectivo: "Efectivo", debito: "Débito", credito: "Crédito", transferencia: "Transferencia" };
 const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -18,16 +18,10 @@ const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "O
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const hoy = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const addMonths = (d, n) => { const x = new Date(d.getFullYear(), d.getMonth() + n, 1); x.setHours(0, 0, 0, 0); return x; };
 const lunesDe = (d) => { const x = new Date(d); const off = (x.getDay() + 6) % 7; x.setDate(x.getDate() - off); x.setHours(0, 0, 0, 0); return x; };
-
-function Metric({ label, value }) {
-  return (
-    <div className="rounded-xl border border-frappe-border bg-frappe-surface px-3 py-2.5">
-      <div className="text-xs text-frappe-textSoft">{label}</div>
-      <div className="text-lg font-bold text-frappe-text">{value}</div>
-    </div>
-  );
-}
+const dd = (d) => String(d.getDate()).padStart(2, "0");
+const mm = (d) => String(d.getMonth() + 1).padStart(2, "0");
 
 // Bloque reutilizable: medios de pago + ranking + convenio.
 function Detalle({ data }) {
@@ -84,55 +78,86 @@ function Comparacion({ comp, unidad }) {
   );
 }
 
+// Barra de navegación entre periodos.
+function NavBar({ label, onPrev, onNext, nextDisabled }) {
+  const btn = "flex h-8 w-8 items-center justify-center rounded-lg border border-frappe-border bg-frappe-surface text-frappe-text transition hover:border-frappe-accent disabled:cursor-not-allowed disabled:opacity-40";
+  return (
+    <div className="mb-4 flex items-center justify-between gap-2">
+      <button onClick={onPrev} className={btn} aria-label="Anterior"><ChevronLeft size={16} /></button>
+      <span className="text-sm font-semibold capitalize text-frappe-text">{label}</span>
+      <button onClick={onNext} disabled={nextDisabled} className={btn} aria-label="Siguiente"><ChevronRight size={16} /></button>
+    </div>
+  );
+}
+
 export default function EstadisticasPage() {
   const [periodo, setPeriodo] = useState("dia");
-  const [diaSel, setDiaSel] = useState(iso(hoy()));
+  const [ancla, setAncla] = useState(hoy()); // fecha de referencia (día/semana/mes seleccionado)
   const [data, setData] = useState(null);
   const [serie, setSerie] = useState(null);
   const [comp, setComp] = useState(null);
   const [cargando, setCargando] = useState(true);
 
-  const semanaDias = (() => { const l = lunesDe(hoy()); return Array.from({ length: 7 }, (_, i) => addDays(l, i)); })();
-  const hoyIso = iso(hoy());
+  const hoyD = hoy();
+  const hoyIso = iso(hoyD);
+
+  // Días de la semana del ancla (para el selector en "Día").
+  const semanaLunes = lunesDe(ancla);
+  const semanaDom = addDays(semanaLunes, 6);
+  const semanaDias = Array.from({ length: 7 }, (_, i) => addDays(semanaLunes, i));
+
+  // Etiquetas de navegación.
+  const labelSemana = `Semana del ${dd(semanaLunes)}/${mm(semanaLunes)} al ${dd(semanaDom)}/${mm(semanaDom)}`;
+  const labelMes = `${MESES[ancla.getMonth()]} ${ancla.getFullYear()}`;
+
+  // Ancla dentro del periodo actual (para deshabilitar "siguiente").
+  const enSemanaActual = semanaLunes.getTime() >= lunesDe(hoyD).getTime();
+  const enMesActual = ancla.getFullYear() > hoyD.getFullYear() ||
+    (ancla.getFullYear() === hoyD.getFullYear() && ancla.getMonth() >= hoyD.getMonth());
+
+  // Mover el ancla sin pasarse del día de hoy.
+  const clamp = (d) => (d > hoyD ? hoyD : d);
+  const shiftDias = (n) => setAncla((a) => clamp(addDays(a, n)));
+  const shiftMeses = (n) => setAncla((a) => clamp(addMonths(a, n)));
 
   useEffect(() => {
     let cancel = false;
     setCargando(true);
     (async () => {
       if (periodo === "dia") {
-        const d = await estadisticasApi.resumen({ desde: diaSel, hasta: diaSel });
+        const di = iso(ancla);
+        const d = await estadisticasApi.resumen({ desde: di, hasta: di });
         if (!cancel) { setData(d); setSerie(null); setComp(null); }
       } else if (periodo === "semana") {
-        const l = lunesDe(hoy()); const dom = addDays(l, 6);
+        const l = lunesDe(ancla); const dom = addDays(l, 6);
         const [d, s, c] = await Promise.all([
           estadisticasApi.resumen({ desde: iso(l), hasta: iso(dom) }),
           estadisticasApi.serie(iso(l), iso(dom)),
-          estadisticasApi.periodos("semana", 6),
+          estadisticasApi.periodos("semana", 6, iso(dom)),
         ]);
         if (!cancel) { setData(d); setSerie(s); setComp(c); }
       } else {
-        const n = new Date(); const y = n.getFullYear(), m = n.getMonth();
+        const y = ancla.getFullYear(), m = ancla.getMonth();
         const ini = new Date(y, m, 1), fin = new Date(y, m + 1, 0);
         const [d, s, c] = await Promise.all([
           estadisticasApi.resumen({ desde: iso(ini), hasta: iso(fin) }),
           estadisticasApi.serie(iso(ini), iso(fin)),
-          estadisticasApi.periodos("mes", 6),
+          estadisticasApi.periodos("mes", 6, iso(fin)),
         ]);
         if (!cancel) { setData(d); setSerie(s); setComp(c); }
       }
     })().finally(() => { if (!cancel) setCargando(false); });
     return () => { cancel = true; };
-  }, [periodo, diaSel]);
+  }, [periodo, ancla]);
 
-  // Datos de gráficos
   const serieSemana = serie ? serie.map((d, i) => ({ label: DIAS[i], short: DIAS[i], value: d.total, highlight: d.fecha === hoyIso })) : [];
   const serieMes = serie ? serie.map((d) => {
     const day = Number(d.fecha.slice(8, 10));
     return { label: `${day}`, short: (day === 1 || day % 5 === 0) ? `${day}` : "", value: d.total, highlight: d.fecha === hoyIso };
   }) : [];
   const compSemana = comp ? comp.map((p, i) => {
-    const [, mm, dd] = p.inicio.split("-");
-    return { label: `Sem ${dd}/${mm}`, short: `${dd}/${mm}`, value: p.total, highlight: i === comp.length - 1 };
+    const [, mmp, ddp] = p.inicio.split("-");
+    return { label: `Sem ${ddp}/${mmp}`, short: `${ddp}/${mmp}`, value: p.total, highlight: i === comp.length - 1 };
   }) : [];
   const compMes = comp ? comp.map((p, i) => {
     const mIdx = Number(p.inicio.slice(5, 7)) - 1;
@@ -143,7 +168,7 @@ export default function EstadisticasPage() {
     <div>
       <div className="mb-4">
         <h1 className="font-serif text-xl font-semibold text-frappe-text">Estadísticas</h1>
-        <p className="text-sm text-frappe-textSoft">Ventas, ranking de productos y formas de pago.</p>
+        <p className="text-sm text-frappe-textSoft">Ventas, ranking de productos y formas de pago. Usa las flechas para ver días, semanas y meses anteriores.</p>
       </div>
 
       <div className="mb-4 flex w-fit gap-1 rounded-lg bg-frappe-accentSoft p-1">
@@ -155,15 +180,21 @@ export default function EstadisticasPage() {
         ))}
       </div>
 
-      {/* Selector de día (solo en Hoy): días de la semana actual */}
+      {(periodo === "dia" || periodo === "semana") && (
+        <NavBar label={labelSemana} onPrev={() => shiftDias(-7)} onNext={() => shiftDias(7)} nextDisabled={enSemanaActual} />
+      )}
+      {periodo === "mes" && (
+        <NavBar label={labelMes} onPrev={() => shiftMeses(-1)} onNext={() => shiftMeses(1)} nextDisabled={enMesActual} />
+      )}
+
       {periodo === "dia" && (
         <div className="mb-4 flex gap-1 overflow-x-auto">
           {semanaDias.map((d, i) => {
             const di = iso(d);
             const futuro = di > hoyIso;
-            const sel = di === diaSel;
+            const sel = di === iso(ancla);
             return (
-              <button key={di} disabled={futuro} onClick={() => setDiaSel(di)}
+              <button key={di} disabled={futuro} onClick={() => setAncla(d)}
                 className={`flex shrink-0 flex-col items-center rounded-lg border px-3 py-1.5 text-xs transition ${
                   sel ? "border-frappe-accent bg-frappe-accent text-white" : futuro ? "border-frappe-border text-frappe-textSoft/40" : "border-frappe-border bg-frappe-surface text-frappe-text hover:border-frappe-accent"
                 }`}>
@@ -185,15 +216,13 @@ export default function EstadisticasPage() {
             <StatCard tone="neutral" icon={Ticket} label="Ticket prom." value={money(data.ticketPromedio)} />
           </div>
 
-          {/* Gráfico diario de la semana */}
           {periodo === "semana" && serie && (
             <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
-              <div className="mb-3 text-sm font-semibold text-frappe-text">Ventas por día (esta semana)</div>
+              <div className="mb-3 text-sm font-semibold text-frappe-text">Ventas por día (semana seleccionada)</div>
               <BarChart data={serieSemana} formatValue={money} showValues />
             </div>
           )}
 
-          {/* Comparación de semanas */}
           {periodo === "semana" && comp && (
             <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
               <div className="mb-2 text-sm font-semibold text-frappe-text">Comparación de semanas</div>
@@ -202,15 +231,13 @@ export default function EstadisticasPage() {
             </div>
           )}
 
-          {/* Gráfico diario del mes */}
           {periodo === "mes" && serie && (
             <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
-              <div className="mb-3 text-sm font-semibold text-frappe-text">Ventas por día (este mes)</div>
+              <div className="mb-3 text-sm font-semibold text-frappe-text">Ventas por día (mes seleccionado)</div>
               <BarChart data={serieMes} formatValue={money} height={140} />
             </div>
           )}
 
-          {/* Comparación de meses */}
           {periodo === "mes" && comp && (
             <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
               <div className="mb-2 text-sm font-semibold text-frappe-text">Comparación de meses</div>
