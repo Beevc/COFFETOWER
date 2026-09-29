@@ -133,3 +133,24 @@ const periodos = asyncHandler(async (req, res) => {
 });
 
 module.exports = { resumen, serie, periodos };
+
+// GET /api/estadisticas/ventas?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
+//  -> lista de ventas del rango (para el detalle expandible por forma de pago).
+const ventasDetalle = asyncHandler(async (req, res) => {
+  const { desde, hasta } = req.query;
+  if (!isDate(desde) || !isDate(hasta)) throw new HttpError(400, "Fechas inválidas");
+  const { rows } = await query(
+    `SELECT v.id, v.numero, v.medio_pago AS medio, v.total,
+            COALESCE(NULLIF(TRIM(ped.nombre_cliente), ''), cli.nombre) AS nombre,
+            v.created_at AS "createdAt"
+       FROM venta v
+       LEFT JOIN pedido ped ON ped.venta_id = v.id
+       LEFT JOIN cliente cli ON cli.id = v.cliente_id
+      WHERE v.local_id = $1 AND v.estado = 'activa' AND v.es_convenio = false
+        AND (v.created_at AT TIME ZONE '${TZ}')::date BETWEEN $2 AND $3
+      ORDER BY v.medio_pago, v.created_at`,
+    [req.user.localId, desde, hasta]
+  );
+  res.json({ ventas: rows });
+});
+module.exports.ventasDetalle = ventasDetalle;

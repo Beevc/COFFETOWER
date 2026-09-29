@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, TrendingUp, TrendingDown, Gift, ArrowUp, ArrowDown, Wallet, Receipt, Ticket, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Gift, ArrowUp, ArrowDown, Wallet, Receipt, Ticket, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { estadisticasApi } from "../../api/estadisticas";
 import { money } from "../../utils/format";
 import BarChart from "../../components/BarChart";
@@ -23,20 +23,44 @@ const lunesDe = (d) => { const x = new Date(d); const off = (x.getDay() + 6) % 7
 const dd = (d) => String(d.getDate()).padStart(2, "0");
 const mm = (d) => String(d.getMonth() + 1).padStart(2, "0");
 
-// Bloque reutilizable: medios de pago + ranking + convenio.
-function Detalle({ data }) {
+// Bloque reutilizable: medios de pago (expandible) + ranking + convenio.
+function Detalle({ data, ventas }) {
+  const [abierto, setAbierto] = useState(null); // medio de pago expandido
+  const grupos = {};
+  (ventas || []).forEach((v) => { (grupos[v.medio] = grupos[v.medio] || []).push(v); });
   return (
     <>
       <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
-        <div className="mb-2 text-sm font-semibold text-frappe-text">Por forma de pago</div>
+        <div className="mb-1 text-sm font-semibold text-frappe-text">Por forma de pago</div>
         {data.porMedioPago.length === 0 ? (
-          <div className="text-sm text-frappe-textSoft">Sin ventas en este período.</div>
-        ) : data.porMedioPago.map((m) => (
-          <div key={m.medio} className="flex justify-between py-1 text-sm">
-            <span className="text-frappe-textSoft">{MEDIO_LABEL[m.medio] || m.medio} ({m.n})</span>
-            <span className="font-semibold text-frappe-text">{money(m.total)}</span>
-          </div>
-        ))}
+          <div className="py-1 text-sm text-frappe-textSoft">Sin ventas en este período.</div>
+        ) : data.porMedioPago.map((m) => {
+          const exp = abierto === m.medio;
+          const lista = grupos[m.medio] || [];
+          return (
+            <div key={m.medio} className="border-b border-frappe-border last:border-0">
+              <button onClick={() => setAbierto(exp ? null : m.medio)} className="flex w-full items-center justify-between py-2 text-sm">
+                <span className="flex items-center gap-1 text-frappe-textSoft">
+                  <ChevronDown size={14} className={`transition-transform ${exp ? "rotate-180" : ""}`} />
+                  {MEDIO_LABEL[m.medio] || m.medio} ({m.n})
+                </span>
+                <span className="font-semibold text-frappe-text">{money(m.total)}</span>
+              </button>
+              {exp && (
+                <div className="mb-2 ml-5 space-y-1 border-l border-frappe-border pl-3">
+                  {lista.length === 0 ? (
+                    <div className="text-xs text-frappe-textSoft">Sin detalle.</div>
+                  ) : lista.map((v) => (
+                    <div key={v.id} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="truncate text-frappe-textSoft">{v.nombre || "Sin nombre"}</span>
+                      <span className="shrink-0 font-medium text-frappe-text">{money(v.total)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
@@ -96,26 +120,23 @@ export default function EstadisticasPage() {
   const [data, setData] = useState(null);
   const [serie, setSerie] = useState(null);
   const [comp, setComp] = useState(null);
+  const [ventas, setVentas] = useState([]); // detalle de ventas del rango
   const [cargando, setCargando] = useState(true);
 
   const hoyD = hoy();
   const hoyIso = iso(hoyD);
 
-  // Días de la semana del ancla (para el selector en "Día").
   const semanaLunes = lunesDe(ancla);
   const semanaDom = addDays(semanaLunes, 6);
   const semanaDias = Array.from({ length: 7 }, (_, i) => addDays(semanaLunes, i));
 
-  // Etiquetas de navegación.
   const labelSemana = `Semana del ${dd(semanaLunes)}/${mm(semanaLunes)} al ${dd(semanaDom)}/${mm(semanaDom)}`;
   const labelMes = `${MESES[ancla.getMonth()]} ${ancla.getFullYear()}`;
 
-  // Ancla dentro del periodo actual (para deshabilitar "siguiente").
   const enSemanaActual = semanaLunes.getTime() >= lunesDe(hoyD).getTime();
   const enMesActual = ancla.getFullYear() > hoyD.getFullYear() ||
     (ancla.getFullYear() === hoyD.getFullYear() && ancla.getMonth() >= hoyD.getMonth());
 
-  // Mover el ancla sin pasarse del día de hoy.
   const clamp = (d) => (d > hoyD ? hoyD : d);
   const shiftDias = (n) => setAncla((a) => clamp(addDays(a, n)));
   const shiftMeses = (n) => setAncla((a) => clamp(addMonths(a, n)));
@@ -124,27 +145,33 @@ export default function EstadisticasPage() {
     let cancel = false;
     setCargando(true);
     (async () => {
+      let desde, hasta;
       if (periodo === "dia") {
-        const di = iso(ancla);
-        const d = await estadisticasApi.resumen({ desde: di, hasta: di });
-        if (!cancel) { setData(d); setSerie(null); setComp(null); }
-      } else if (periodo === "semana") {
-        const l = lunesDe(ancla); const dom = addDays(l, 6);
-        const [d, s, c] = await Promise.all([
-          estadisticasApi.resumen({ desde: iso(l), hasta: iso(dom) }),
-          estadisticasApi.serie(iso(l), iso(dom)),
-          estadisticasApi.periodos("semana", 6, iso(dom)),
+        desde = hasta = iso(ancla);
+        const [d, v] = await Promise.all([
+          estadisticasApi.resumen({ desde, hasta }),
+          estadisticasApi.ventas(desde, hasta),
         ]);
-        if (!cancel) { setData(d); setSerie(s); setComp(c); }
+        if (!cancel) { setData(d); setSerie(null); setComp(null); setVentas(v); }
+      } else if (periodo === "semana") {
+        desde = iso(semanaLunes); hasta = iso(semanaDom);
+        const [d, s, c, v] = await Promise.all([
+          estadisticasApi.resumen({ desde, hasta }),
+          estadisticasApi.serie(desde, hasta),
+          estadisticasApi.periodos("semana", 6, hasta),
+          estadisticasApi.ventas(desde, hasta),
+        ]);
+        if (!cancel) { setData(d); setSerie(s); setComp(c); setVentas(v); }
       } else {
         const y = ancla.getFullYear(), m = ancla.getMonth();
-        const ini = new Date(y, m, 1), fin = new Date(y, m + 1, 0);
-        const [d, s, c] = await Promise.all([
-          estadisticasApi.resumen({ desde: iso(ini), hasta: iso(fin) }),
-          estadisticasApi.serie(iso(ini), iso(fin)),
-          estadisticasApi.periodos("mes", 6, iso(fin)),
+        desde = iso(new Date(y, m, 1)); hasta = iso(new Date(y, m + 1, 0));
+        const [d, s, c, v] = await Promise.all([
+          estadisticasApi.resumen({ desde, hasta }),
+          estadisticasApi.serie(desde, hasta),
+          estadisticasApi.periodos("mes", 6, hasta),
+          estadisticasApi.ventas(desde, hasta),
         ]);
-        if (!cancel) { setData(d); setSerie(s); setComp(c); }
+        if (!cancel) { setData(d); setSerie(s); setComp(c); setVentas(v); }
       }
     })().finally(() => { if (!cancel) setCargando(false); });
     return () => { cancel = true; };
@@ -246,7 +273,7 @@ export default function EstadisticasPage() {
             </div>
           )}
 
-          <Detalle data={data} />
+          <Detalle data={data} ventas={ventas} />
         </div>
       )}
     </div>
