@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const proveedores = require("./proveedores.controller");
 const facturas = require("./facturas.controller");
+const movimientos = require("./movimientos.controller");
 const { resumen } = require("./resumen.controller");
 const { costos, costoDetalle } = require("./costos.controller");
 const { validateBody } = require("../../middleware/validate");
@@ -36,5 +37,10 @@ router.delete("/pagos/:id", facturas.removePago);
 // Cuotas (plan de pagos programados).
 router.post("/facturas/:id/cuotas", validateBody(facturas.generarCuotasSchema), facturas.generarCuotas);
 router.post("/facturas/:id/cuotas/:cuotaId/pagar", validateBody(facturas.pagarCuotaSchema), facturas.pagarCuota);
+
+// Movimientos de caja (ingresos / retiros manuales).
+router.get("/movimientos", movimientos.list);
+router.post("/movimientos", validateBody(movimientos.createSchema), movimientos.create);
+router.delete("/movimientos/:id", movimientos.remove);
 
 module.exports = router;

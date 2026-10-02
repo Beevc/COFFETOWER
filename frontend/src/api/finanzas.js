@@ -22,4 +22,8 @@ export const finanzasApi = {
   generarCuotas: (id, cuotas) => api.post(`/finanzas/facturas/${id}/cuotas`, { cuotas }).then((r) => r.data.factura),
   pagarCuota: (id, cuotaId, data) =>
     api.post(`/finanzas/facturas/${id}/cuotas/${cuotaId}/pagar`, data).then((r) => r.data.factura),
+
+  movimientos: (params = {}) => api.get("/finanzas/movimientos", { params }).then((r) => r.data.movimientos),
+  crearMovimiento: (data) => api.post("/finanzas/movimientos", data).then((r) => r.data.movimiento),
+  eliminarMovimiento: (id) => api.delete(`/finanzas/movimientos/${id}`).then((r) => r.data),
 };

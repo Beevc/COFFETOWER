@@ -1,14 +1,16 @@
 import { useEffect, useState, useCallback } from "react";
-import { Loader2, TrendingUp, TrendingDown, Wallet, AlertTriangle } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Wallet, AlertTriangle, PiggyBank, ArrowDownCircle } from "lucide-react";
 import { finanzasApi } from "../../api/finanzas";
 import { money } from "../../utils/format";
 import { catLabel } from "./finanzas/constants";
 import FacturasView from "./finanzas/FacturasView";
 import ProveedoresView from "./finanzas/ProveedoresView";
 import CostosView from "./finanzas/CostosView";
+import MovimientosView from "./finanzas/MovimientosView";
 
 const TABS = [
   { id: "resumen", label: "Resumen" },
+  { id: "movimientos", label: "Caja" },
   { id: "facturas", label: "Facturas" },
   { id: "costos", label: "Costos" },
   { id: "proveedores", label: "Proveedores" },
@@ -34,8 +36,17 @@ function Metric({ label, value, icon: Icon, tone = "text-frappe-text", sub }) {
   );
 }
 
-function Resumen() {
-  const [mes, setMes] = useState(mesActual());
+function MonthPicker({ mes, setMes }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-frappe-textSoft">Mes</span>
+      <input type="month" value={mes} onChange={(e) => setMes(e.target.value)}
+        className="rounded-lg border border-frappe-border bg-frappe-surface px-3 py-1.5 text-sm outline-none focus:border-frappe-accent" />
+    </div>
+  );
+}
+
+function Resumen({ mes, setMes }) {
   const [data, setData] = useState(null);
   const [cargando, setCargando] = useState(true);
 
@@ -47,26 +58,36 @@ function Resumen() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-frappe-textSoft">Mes</span>
-        <input type="month" value={mes} onChange={(e) => setMes(e.target.value)}
-          className="rounded-lg border border-frappe-border bg-frappe-surface px-3 py-1.5 text-sm outline-none focus:border-frappe-accent" />
-      </div>
+      <MonthPicker mes={mes} setMes={setMes} />
 
       {cargando || !data ? (
         <div className="flex items-center justify-center gap-2 py-12 text-frappe-textSoft"><Loader2 size={18} className="animate-spin" /> Cargando…</div>
       ) : (
         <>
+          {/* Saldo anterior */}
+          <Metric label="Saldo anterior (antes del mes)" value={money(data.saldoAnterior)} icon={PiggyBank}
+            tone={data.saldoAnterior >= 0 ? "text-frappe-text" : "text-frappe-danger"} />
+
           <div className="grid grid-cols-2 gap-2">
             <Metric label="Ingresos (ventas)" value={money(data.ingresos)} icon={TrendingUp} tone="text-frappe-success" sub={`${data.ventasCount} ventas`} />
-            <Metric label="Gastos" value={money(data.gastos)} icon={TrendingDown} tone="text-frappe-danger" sub={`${data.gastosCount} facturas`} />
+            <Metric label="Otros ingresos" value={money(data.otrosIngresos)} icon={TrendingUp} tone="text-frappe-success" />
           </div>
-          <Metric
-            label="Ganancia del mes"
-            value={money(data.ganancia)}
-            icon={Wallet}
-            tone={data.ganancia >= 0 ? "text-frappe-success" : "text-frappe-danger"}
-          />
+          <div className="grid grid-cols-2 gap-2">
+            <Metric label="Gastos" value={money(data.gastos)} icon={TrendingDown} tone="text-frappe-danger" sub={`${data.gastosCount} facturas`} />
+            <Metric label="Retiros" value={money(data.retiros)} icon={ArrowDownCircle} tone="text-frappe-danger" />
+          </div>
+
+          <Metric label="Ganancia del mes (ventas - gastos)" value={money(data.ganancia)} icon={Wallet}
+            tone={data.ganancia >= 0 ? "text-frappe-success" : "text-frappe-danger"} />
+
+          {/* Saldo actual destacado */}
+          <div className="rounded-xl border-2 border-frappe-accent bg-frappe-accentSoft px-4 py-3">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-frappe-accentDark">
+              <Wallet size={13} /> Saldo actual
+            </div>
+            <div className={`text-2xl font-bold ${data.saldoActual >= 0 ? "text-frappe-accentDark" : "text-frappe-danger"}`}>{money(data.saldoActual)}</div>
+            <div className="text-xs text-frappe-textSoft">Saldo anterior + ingresos - gastos - retiros</div>
+          </div>
 
           {/* Cuentas por pagar */}
           <div className="rounded-xl border border-frappe-border bg-frappe-surface px-4 py-3">
@@ -109,6 +130,7 @@ function Resumen() {
 
 export default function FinanzasPage() {
   const [tab, setTab] = useState("resumen");
+  const [mes, setMes] = useState(mesActual());
   const [proveedores, setProveedores] = useState([]);
 
   const cargarProveedores = useCallback(async () => {
@@ -121,19 +143,25 @@ export default function FinanzasPage() {
     <div>
       <div className="mb-4">
         <h1 className="font-serif text-xl font-semibold text-frappe-text">Finanzas</h1>
-        <p className="text-sm text-frappe-textSoft">Ingresos, gastos y cuentas por pagar del local.</p>
+        <p className="text-sm text-frappe-textSoft">Ingresos, gastos, caja y cuentas por pagar del local.</p>
       </div>
 
-      <div className="mb-4 flex gap-1 rounded-lg bg-frappe-accentSoft p-1">
+      <div className="mb-4 flex gap-1 overflow-x-auto rounded-lg bg-frappe-accentSoft p-1">
         {TABS.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-semibold transition ${tab === t.id ? "bg-frappe-surface text-frappe-accentDark shadow-sm" : "text-frappe-textSoft hover:text-frappe-text"}`}>
+            className={`flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold transition ${tab === t.id ? "bg-frappe-surface text-frappe-accentDark shadow-sm" : "text-frappe-textSoft hover:text-frappe-text"}`}>
             {t.label}
           </button>
         ))}
       </div>
 
-      {tab === "resumen" && <Resumen />}
+      {tab === "resumen" && <Resumen mes={mes} setMes={setMes} />}
+      {tab === "movimientos" && (
+        <div className="flex flex-col gap-3">
+          <MonthPicker mes={mes} setMes={setMes} />
+          <MovimientosView mes={mes} />
+        </div>
+      )}
       {tab === "facturas" && <FacturasView proveedores={proveedores} onData={cargarProveedores} />}
       {tab === "costos" && <CostosView />}
       {tab === "proveedores" && <ProveedoresView proveedores={proveedores} onChanged={cargarProveedores} />}

@@ -8,7 +8,7 @@ const TZ = "America/Santiago";
 const resumen = asyncHandler(async (req, res) => {
   const localId = req.user.localId;
   const hoyTz = `((now() AT TIME ZONE '${TZ}')::date)`;
-  // Rango: por defecto, primer día del mes actual hasta hoy.
+  const inicio = `COALESCE($2::date, date_trunc('month', ${hoyTz})::date)`; // inicio del rango
   const desde = req.query.desde || null;
   const hasta = req.query.hasta || null;
 
@@ -18,8 +18,7 @@ const resumen = asyncHandler(async (req, res) => {
       FROM venta
      WHERE local_id = $1 AND estado <> 'anulada' AND es_convenio = false
        AND ((created_at AT TIME ZONE '${TZ}')::date)
-           BETWEEN COALESCE($2::date, date_trunc('month', ${hoyTz})::date)
-               AND COALESCE($3::date, ${hoyTz})`;
+           BETWEEN ${inicio} AND COALESCE($3::date, ${hoyTz})`;
   const { rows: ing } = await query(ingresosSql, [localId, desde, hasta]);
 
   // Gastos = facturas emitidas en el rango.
@@ -27,17 +26,40 @@ const resumen = asyncHandler(async (req, res) => {
     SELECT COALESCE(SUM(monto_total),0) AS total, COUNT(*) AS n
       FROM factura
      WHERE local_id = $1
-       AND fecha_emision BETWEEN COALESCE($2::date, date_trunc('month', ${hoyTz})::date)
-                             AND COALESCE($3::date, ${hoyTz})`;
+       AND fecha_emision BETWEEN ${inicio} AND COALESCE($3::date, ${hoyTz})`;
   const { rows: gas } = await query(gastosSql, [localId, desde, hasta]);
+
+  // Movimientos de caja manuales en el rango (otros ingresos / retiros).
+  const movSql = `
+    SELECT
+      COALESCE(SUM(monto) FILTER (WHERE tipo = 'ingreso'),0) AS ingresos,
+      COALESCE(SUM(monto) FILTER (WHERE tipo = 'retiro'),0) AS retiros
+      FROM movimiento_caja
+     WHERE local_id = $1
+       AND fecha BETWEEN ${inicio} AND COALESCE($3::date, ${hoyTz})`;
+  const { rows: mov } = await query(movSql, [localId, desde, hasta]);
+
+  // Saldo anterior = todo lo acumulado ANTES del inicio del rango.
+  const saldoAntSql = `
+    SELECT
+      COALESCE((SELECT SUM(total) FROM venta
+                 WHERE local_id = $1 AND estado <> 'anulada' AND es_convenio = false
+                   AND ((created_at AT TIME ZONE '${TZ}')::date) < ${inicio}),0)
+    + COALESCE((SELECT SUM(monto) FROM movimiento_caja
+                 WHERE local_id = $1 AND tipo = 'ingreso' AND fecha < ${inicio}),0)
+    - COALESCE((SELECT SUM(monto_total) FROM factura
+                 WHERE local_id = $1 AND fecha_emision < ${inicio}),0)
+    - COALESCE((SELECT SUM(monto) FROM movimiento_caja
+                 WHERE local_id = $1 AND tipo = 'retiro' AND fecha < ${inicio}),0)
+      AS saldo`;
+  const { rows: sant } = await query(saldoAntSql, [localId, desde]);
 
   // Gastos por categoría en el rango.
   const catSql = `
     SELECT categoria, COALESCE(SUM(monto_total),0) AS total, COUNT(*) AS n
       FROM factura
      WHERE local_id = $1
-       AND fecha_emision BETWEEN COALESCE($2::date, date_trunc('month', ${hoyTz})::date)
-                             AND COALESCE($3::date, ${hoyTz})
+       AND fecha_emision BETWEEN ${inicio} AND COALESCE($3::date, ${hoyTz})
      GROUP BY categoria ORDER BY total DESC`;
   const { rows: cats } = await query(catSql, [localId, desde, hasta]);
 
@@ -57,12 +79,20 @@ const resumen = asyncHandler(async (req, res) => {
 
   const ingresos = Number(ing[0].total);
   const gastos = Number(gas[0].total);
+  const otrosIngresos = Number(mov[0].ingresos);
+  const retiros = Number(mov[0].retiros);
+  const saldoAnterior = Number(sant[0].saldo);
+  const saldoActual = saldoAnterior + ingresos + otrosIngresos - gastos - retiros;
   res.json({
+    saldoAnterior,
     ingresos,
     ventasCount: Number(ing[0].n),
+    otrosIngresos,
     gastos,
     gastosCount: Number(gas[0].n),
+    retiros,
     ganancia: ingresos - gastos,
+    saldoActual,
     porCategoria: cats.map((c) => ({ categoria: c.categoria, total: Number(c.total), n: Number(c.n) })),
     cuentasPorPagar: {
       totalAdeudado: Number(cxp[0].total_adeudado),
