@@ -64,7 +64,7 @@ const SELECT_PEDIDO = `
 const activos = asyncHandler(async (req, res) => {
   const { rows } = await query(
     `${SELECT_PEDIDO}
-      WHERE p.local_id = $1 AND p.estado = ANY($2::pedido_estado[])
+      WHERE p.local_id = $1 AND p.estado = ANY($2::pedido_estado[]) AND v.estado <> 'anulada'
       ORDER BY
         CASE p.estado WHEN 'pendiente' THEN 0 WHEN 'en_preparacion' THEN 1 ELSE 2 END,
         CASE p.momento WHEN 'al_momento' THEN 0 WHEN 'programado' THEN 1 ELSE 2 END,
@@ -80,7 +80,7 @@ const entregadosHoy = asyncHandler(async (req, res) => {
   const inicioHoy = `(date_trunc('day', (now() AT TIME ZONE '${TZ}')) AT TIME ZONE '${TZ}')`;
   const { rows } = await query(
     `${SELECT_PEDIDO}
-      WHERE p.local_id = $1 AND p.estado = 'entregado' AND p.entregado_en >= ${inicioHoy}
+      WHERE p.local_id = $1 AND p.estado = 'entregado' AND v.estado <> 'anulada' AND p.entregado_en >= ${inicioHoy}
       ORDER BY p.entregado_en DESC`,
     [req.user.localId]
   );

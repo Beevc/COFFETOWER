@@ -7,7 +7,6 @@ const TZ = "America/Santiago";
 const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || "");
 
 // Construye el filtro de rango: por fechas (desde/hasta) o por periodo (hasta ahora).
-// Devuelve { params, cond(col) } donde los params van después de localId ($1).
 function makeRango(req) {
   const { desde, hasta, periodo } = req.query;
   if (isDate(desde) && isDate(hasta)) {
@@ -30,39 +29,31 @@ const resumen = asyncHandler(async (req, res) => {
   const r = makeRango(req);
   const p = [localId, ...r.params];
 
-  const { rows: r1 } = await query(
-    `SELECT COALESCE(SUM(total),0)::int AS total, COUNT(*)::int AS n_ventas
-       FROM venta
-      WHERE local_id = $1 AND estado = 'activa' AND es_convenio = false ${r.cond("created_at")}`,
-    p
-  );
+  // Las 4 consultas son independientes -> se corren en paralelo (más rápido).
+  const [{ rows: r1 }, { rows: medios }, { rows: ranking }, { rows: conv }] = await Promise.all([
+    query(
+      `SELECT COALESCE(SUM(total),0)::int AS total, COUNT(*)::int AS n_ventas
+         FROM venta
+        WHERE local_id = $1 AND estado = 'activa' AND es_convenio = false ${r.cond("created_at")}`, p),
+    query(
+      `SELECT medio_pago AS medio, COALESCE(SUM(total),0)::int AS total, COUNT(*)::int AS n
+         FROM venta
+        WHERE local_id = $1 AND estado = 'activa' AND es_convenio = false ${r.cond("created_at")}
+        GROUP BY medio_pago ORDER BY total DESC`, p),
+    query(
+      `SELECT vi.producto_id AS "productoId", vi.nombre,
+              SUM(vi.cantidad)::int AS cantidad, SUM(vi.subtotal)::int AS total
+         FROM venta_item vi JOIN venta v ON v.id = vi.venta_id
+        WHERE v.local_id = $1 AND v.estado = 'activa' AND v.es_convenio = false ${r.cond("v.created_at")}
+        GROUP BY vi.producto_id, vi.nombre ORDER BY cantidad DESC`, p),
+    query(
+      `SELECT COUNT(DISTINCT v.id)::int AS n, COALESCE(SUM(vi.cantidad),0)::int AS unidades
+         FROM venta v LEFT JOIN venta_item vi ON vi.venta_id = v.id
+        WHERE v.local_id = $1 AND v.estado = 'activa' AND v.es_convenio = true ${r.cond("v.created_at")}`, p),
+  ]);
+
   const total = r1[0].total;
   const nVentas = r1[0].n_ventas;
-
-  const { rows: medios } = await query(
-    `SELECT medio_pago AS medio, COALESCE(SUM(total),0)::int AS total, COUNT(*)::int AS n
-       FROM venta
-      WHERE local_id = $1 AND estado = 'activa' AND es_convenio = false ${r.cond("created_at")}
-      GROUP BY medio_pago ORDER BY total DESC`,
-    p
-  );
-
-  const { rows: ranking } = await query(
-    `SELECT vi.producto_id AS "productoId", vi.nombre,
-            SUM(vi.cantidad)::int AS cantidad, SUM(vi.subtotal)::int AS total
-       FROM venta_item vi JOIN venta v ON v.id = vi.venta_id
-      WHERE v.local_id = $1 AND v.estado = 'activa' AND v.es_convenio = false ${r.cond("v.created_at")}
-      GROUP BY vi.producto_id, vi.nombre ORDER BY cantidad DESC`,
-    p
-  );
-
-  const { rows: conv } = await query(
-    `SELECT COUNT(DISTINCT v.id)::int AS n, COALESCE(SUM(vi.cantidad),0)::int AS unidades
-       FROM venta v LEFT JOIN venta_item vi ON vi.venta_id = v.id
-      WHERE v.local_id = $1 AND v.estado = 'activa' AND v.es_convenio = true ${r.cond("v.created_at")}`,
-    p
-  );
-
   res.json({
     totalVentas: total,
     nVentas,
@@ -102,7 +93,6 @@ const periodos = asyncHandler(async (req, res) => {
     ? "(p.inicio + interval '1 month' - interval '1 day')::date"
     : "(p.inicio + interval '6 day')::date";
 
-  // Ancla del último periodo: la fecha `hasta` (si es válida) o ahora.
   const params = [req.user.localId, n];
   let anclaExpr;
   if (isDate(req.query.hasta)) {
@@ -132,8 +122,6 @@ const periodos = asyncHandler(async (req, res) => {
   res.json({ tipo, periodos: rows.map((r) => ({ inicio: r.inicio, fin: r.fin, total: r.total, nVentas: r.n })) });
 });
 
-module.exports = { resumen, serie, periodos };
-
 // GET /api/estadisticas/ventas?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
 //  -> lista de ventas del rango (para el detalle expandible por forma de pago).
 const ventasDetalle = asyncHandler(async (req, res) => {
@@ -153,4 +141,5 @@ const ventasDetalle = asyncHandler(async (req, res) => {
   );
   res.json({ ventas: rows });
 });
-module.exports.ventasDetalle = ventasDetalle;
+
+module.exports = { resumen, serie, periodos, ventasDetalle };
