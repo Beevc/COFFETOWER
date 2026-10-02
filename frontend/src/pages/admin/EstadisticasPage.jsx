@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, TrendingUp, TrendingDown, Gift, ArrowUp, ArrowDown, Wallet, Receipt, Ticket, ChevronLeft, ChevronRight, ChevronDown, Coffee } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Gift, ArrowUp, ArrowDown, Wallet, Receipt, Ticket, ChevronLeft, ChevronRight, ChevronDown, Coffee, Tag } from "lucide-react";
 import { estadisticasApi } from "../../api/estadisticas";
 import { money } from "../../utils/format";
 import BarChart from "../../components/BarChart";
@@ -149,7 +149,10 @@ function Conteo() {
         <div className="flex items-center justify-center gap-2 py-12 text-frappe-textSoft"><Loader2 size={18} className="animate-spin" /> Cargando…</div>
       ) : (
         <>
-          <StatCard tone="accent" icon={Coffee} label="Frappés realizados" value={data.total} />
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <StatCard tone="accent" icon={Coffee} label="Frappés realizados" value={data.total} sub={`${data.convenio} de convenio`} />
+            <StatCard tone="neutral" icon={Tag} label="Promos 2x aplicadas" value={data.promos} />
+          </div>
 
           <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
             <div className="mb-2 text-sm font-semibold text-frappe-text">Por sabor</div>

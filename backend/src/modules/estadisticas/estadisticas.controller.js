@@ -145,8 +145,7 @@ const ventasDetalle = asyncHandler(async (req, res) => {
 module.exports = { resumen, serie, periodos, ventasDetalle };
 
 // GET /api/estadisticas/conteo[?desde=YYYY-MM-DD&hasta=YYYY-MM-DD]
-//  -> cuántas unidades por producto (sabor) y por opción (proteína, etc.).
-//  Sin fechas: histórico completo. Incluye convenio (son frappes realizados), excluye anuladas.
+//  -> frappés por sabor y por opción; total, de convenio y promos (packs) aplicadas.
 const conteo = asyncHandler(async (req, res) => {
   const { desde, hasta } = req.query;
   const params = [req.user.localId];
@@ -155,7 +154,7 @@ const conteo = asyncHandler(async (req, res) => {
     params.push(desde, hasta);
     cond = `AND (v.created_at AT TIME ZONE '${TZ}')::date BETWEEN $2 AND $3`;
   }
-  const [{ rows: prods }, { rows: ops }] = await Promise.all([
+  const [{ rows: prods }, { rows: ops }, { rows: conv }, { rows: pk }] = await Promise.all([
     query(
       `SELECT vi.producto_id AS "productoId", vi.nombre, SUM(vi.cantidad)::int AS cantidad
          FROM venta_item vi JOIN venta v ON v.id = vi.venta_id
@@ -168,10 +167,28 @@ const conteo = asyncHandler(async (req, res) => {
          JOIN venta v ON v.id = vi.venta_id
         WHERE v.local_id = $1 AND v.estado <> 'anulada' ${cond}
         GROUP BY vio.nombre ORDER BY cantidad DESC, vio.nombre`, params),
+    query(
+      `SELECT COALESCE(SUM(vi.cantidad),0)::int AS cantidad
+         FROM venta_item vi JOIN venta v ON v.id = vi.venta_id
+        WHERE v.local_id = $1 AND v.estado <> 'anulada' AND v.es_convenio = true ${cond}`, params),
+    query(
+      `WITH lin AS (
+         SELECT v.id AS venta_id, vi.producto_id,
+                SUM(vi.cantidad) AS qty, MIN(pr.pack_cantidad) AS packcant
+           FROM venta_item vi
+           JOIN venta v ON v.id = vi.venta_id
+           JOIN promocion pr ON pr.producto_id = vi.producto_id AND pr.local_id = v.local_id
+                AND pr.tipo_descuento = 'pack' AND pr.activo = true
+          WHERE v.local_id = $1 AND v.estado <> 'anulada' ${cond}
+          GROUP BY v.id, vi.producto_id
+       )
+       SELECT COALESCE(SUM(FLOOR(qty / NULLIF(packcant,0))),0)::int AS packs FROM lin`, params),
   ]);
   const total = prods.reduce((s, p) => s + Number(p.cantidad), 0);
   res.json({
     total,
+    convenio: Number(conv[0].cantidad),
+    promos: Number(pk[0].packs),
     productos: prods.map((p) => ({ productoId: p.productoId, nombre: p.nombre, cantidad: Number(p.cantidad) })),
     opciones: ops.map((o) => ({ nombre: o.nombre, cantidad: Number(o.cantidad) })),
   });
