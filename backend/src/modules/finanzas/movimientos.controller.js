@@ -7,6 +7,7 @@ const fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida (YYYY-MM-
 
 const createSchema = z.object({
   tipo: z.enum(["ingreso", "retiro"], { message: "Tipo inválido" }),
+  medio: z.enum(["efectivo", "transferencia"], { message: "Medio inválido" }),
   monto: z.number().int("El monto debe ser entero").positive("El monto debe ser mayor a 0"),
   fecha,
   descripcion: z.string().trim().max(200).optional(),
@@ -15,6 +16,7 @@ const createSchema = z.object({
 const publicMov = (m) => ({
   id: m.id,
   tipo: m.tipo,
+  medio: m.medio,
   monto: Number(m.monto),
   fecha: m.fecha,
   descripcion: m.descripcion,
@@ -34,11 +36,11 @@ const list = asyncHandler(async (req, res) => {
 
 // POST /api/finanzas/movimientos
 const create = asyncHandler(async (req, res) => {
-  const { tipo, monto, fecha: f, descripcion } = req.body;
+  const { tipo, medio, monto, fecha: f, descripcion } = req.body;
   const { rows } = await query(
-    `INSERT INTO movimiento_caja (local_id, tipo, monto, fecha, descripcion, creado_por_id)
-     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-    [req.user.localId, tipo, monto, f, descripcion || null, req.user.id]
+    `INSERT INTO movimiento_caja (local_id, tipo, medio, monto, fecha, descripcion, creado_por_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+    [req.user.localId, tipo, medio, monto, f, descripcion || null, req.user.id]
   );
   res.status(201).json({ movimiento: publicMov(rows[0]) });
 });
