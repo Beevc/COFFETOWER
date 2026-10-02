@@ -143,3 +143,37 @@ const ventasDetalle = asyncHandler(async (req, res) => {
 });
 
 module.exports = { resumen, serie, periodos, ventasDetalle };
+
+// GET /api/estadisticas/conteo[?desde=YYYY-MM-DD&hasta=YYYY-MM-DD]
+//  -> cuántas unidades por producto (sabor) y por opción (proteína, etc.).
+//  Sin fechas: histórico completo. Incluye convenio (son frappes realizados), excluye anuladas.
+const conteo = asyncHandler(async (req, res) => {
+  const { desde, hasta } = req.query;
+  const params = [req.user.localId];
+  let cond = "";
+  if (isDate(desde) && isDate(hasta)) {
+    params.push(desde, hasta);
+    cond = `AND (v.created_at AT TIME ZONE '${TZ}')::date BETWEEN $2 AND $3`;
+  }
+  const [{ rows: prods }, { rows: ops }] = await Promise.all([
+    query(
+      `SELECT vi.producto_id AS "productoId", vi.nombre, SUM(vi.cantidad)::int AS cantidad
+         FROM venta_item vi JOIN venta v ON v.id = vi.venta_id
+        WHERE v.local_id = $1 AND v.estado <> 'anulada' ${cond}
+        GROUP BY vi.producto_id, vi.nombre ORDER BY cantidad DESC, vi.nombre`, params),
+    query(
+      `SELECT vio.nombre, SUM(vi.cantidad)::int AS cantidad
+         FROM venta_item_opcion vio
+         JOIN venta_item vi ON vi.id = vio.venta_item_id
+         JOIN venta v ON v.id = vi.venta_id
+        WHERE v.local_id = $1 AND v.estado <> 'anulada' ${cond}
+        GROUP BY vio.nombre ORDER BY cantidad DESC, vio.nombre`, params),
+  ]);
+  const total = prods.reduce((s, p) => s + Number(p.cantidad), 0);
+  res.json({
+    total,
+    productos: prods.map((p) => ({ productoId: p.productoId, nombre: p.nombre, cantidad: Number(p.cantidad) })),
+    opciones: ops.map((o) => ({ nombre: o.nombre, cantidad: Number(o.cantidad) })),
+  });
+});
+module.exports.conteo = conteo;

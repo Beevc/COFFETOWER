@@ -7,4 +7,6 @@ export const estadisticasApi = {
   periodos: (tipo, n = 6, hasta) =>
     api.get("/estadisticas/periodos", { params: hasta ? { tipo, n, hasta } : { tipo, n } }).then((r) => r.data.periodos),
   ventas: (desde, hasta) => api.get("/estadisticas/ventas", { params: { desde, hasta } }).then((r) => r.data.ventas),
+  conteo: (desde, hasta) =>
+    api.get("/estadisticas/conteo", { params: desde && hasta ? { desde, hasta } : {} }).then((r) => r.data),
 };

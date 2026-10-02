@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, TrendingUp, TrendingDown, Gift, ArrowUp, ArrowDown, Wallet, Receipt, Ticket, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Gift, ArrowUp, ArrowDown, Wallet, Receipt, Ticket, ChevronLeft, ChevronRight, ChevronDown, Coffee } from "lucide-react";
 import { estadisticasApi } from "../../api/estadisticas";
 import { money } from "../../utils/format";
 import BarChart from "../../components/BarChart";
@@ -9,6 +9,7 @@ const PERIODOS = [
   { id: "dia", label: "Día" },
   { id: "semana", label: "Semana" },
   { id: "mes", label: "Mes" },
+  { id: "conteo", label: "Conteo" },
 ];
 const MEDIO_LABEL = { efectivo: "Efectivo", debito: "Débito", credito: "Crédito", transferencia: "Transferencia" };
 const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -114,7 +115,73 @@ function NavBar({ label, onPrev, onNext, nextDisabled }) {
   );
 }
 
+// Conteo de frappés por sabor y por opción (proteína, etc.).
+function Conteo() {
+  const [rango, setRango] = useState("historico");
+  const [data, setData] = useState(null);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    setCargando(true);
+    let desde, hasta;
+    const h = hoy();
+    if (rango === "hoy") { desde = iso(h); hasta = iso(h); }
+    else if (rango === "semana") { const l = lunesDe(h); desde = iso(l); hasta = iso(addDays(l, 6)); }
+    else if (rango === "mes") { const y = h.getFullYear(), m = h.getMonth(); desde = iso(new Date(y, m, 1)); hasta = iso(new Date(y, m + 1, 0)); }
+    let cancel = false;
+    estadisticasApi.conteo(desde, hasta).then((d) => { if (!cancel) setData(d); }).finally(() => { if (!cancel) setCargando(false); });
+    return () => { cancel = true; };
+  }, [rango]);
+
+  const OPC = [["historico", "Histórico"], ["mes", "Este mes"], ["semana", "Semana"], ["hoy", "Hoy"]];
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex w-fit gap-1 rounded-lg bg-frappe-accentSoft p-1">
+        {OPC.map(([id, label]) => (
+          <button key={id} onClick={() => setRango(id)}
+            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${rango === id ? "bg-frappe-surface text-frappe-accentDark shadow-sm" : "text-frappe-textSoft hover:text-frappe-text"}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {cargando || !data ? (
+        <div className="flex items-center justify-center gap-2 py-12 text-frappe-textSoft"><Loader2 size={18} className="animate-spin" /> Cargando…</div>
+      ) : (
+        <>
+          <StatCard tone="accent" icon={Coffee} label="Frappés realizados" value={data.total} />
+
+          <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
+            <div className="mb-2 text-sm font-semibold text-frappe-text">Por sabor</div>
+            {data.productos.length === 0 ? (
+              <div className="py-1 text-sm text-frappe-textSoft">Sin datos en este período.</div>
+            ) : data.productos.map((p) => (
+              <div key={p.productoId} className="flex items-center justify-between border-b border-frappe-border py-1.5 text-sm last:border-0">
+                <span className="text-frappe-text">{p.nombre}</span>
+                <span className="font-bold text-frappe-text">{p.cantidad}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-4 shadow-sm">
+            <div className="mb-2 text-sm font-semibold text-frappe-text">Opciones (extras y cambios)</div>
+            {data.opciones.length === 0 ? (
+              <div className="py-1 text-sm text-frappe-textSoft">Sin opciones registradas.</div>
+            ) : data.opciones.map((o, i) => (
+              <div key={i} className="flex items-center justify-between border-b border-frappe-border py-1.5 text-sm last:border-0">
+                <span className="text-frappe-text">{o.nombre}</span>
+                <span className="font-bold text-frappe-text">{o.cantidad}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function EstadisticasPage() {
+
   const [periodo, setPeriodo] = useState("dia");
   const [ancla, setAncla] = useState(hoy()); // fecha de referencia (día/semana/mes seleccionado)
   const [data, setData] = useState(null);
@@ -143,6 +210,7 @@ export default function EstadisticasPage() {
 
   useEffect(() => {
     let cancel = false;
+    if (periodo === "conteo") { setCargando(false); return; }
     setCargando(true);
     (async () => {
       let desde, hasta;
@@ -233,7 +301,9 @@ export default function EstadisticasPage() {
         </div>
       )}
 
-      {cargando || !data ? (
+      {periodo === "conteo" ? (
+        <Conteo />
+      ) : cargando || !data ? (
         <div className="flex items-center justify-center gap-2 py-16 text-frappe-textSoft"><Loader2 size={18} className="animate-spin" /> Cargando…</div>
       ) : (
         <div className="flex flex-col gap-4">
