@@ -14,7 +14,11 @@ const resumen = asyncHandler(async (req, res) => {
 
   // Ingresos = ventas reales (no anuladas, no convenio) en el rango, por fecha local.
   const ingresosSql = `
-    SELECT COALESCE(SUM(total),0) AS total, COUNT(*) AS n
+    SELECT COALESCE(SUM(total),0) AS total, COUNT(*) AS n,
+           COALESCE(SUM(total) FILTER (WHERE medio_pago = 'efectivo'),0) AS efectivo,
+           COALESCE(SUM(total) FILTER (WHERE medio_pago = 'debito'),0) AS debito,
+           COALESCE(SUM(total) FILTER (WHERE medio_pago = 'credito'),0) AS credito,
+           COALESCE(SUM(total) FILTER (WHERE medio_pago = 'transferencia'),0) AS transferencia
       FROM venta
      WHERE local_id = $1 AND estado <> 'anulada' AND es_convenio = false
        AND ((created_at AT TIME ZONE '${TZ}')::date)
@@ -87,6 +91,11 @@ const resumen = asyncHandler(async (req, res) => {
     saldoAnterior,
     ingresos,
     ventasCount: Number(ing[0].n),
+    ingresosPorMedio: {
+      efectivo: Number(ing[0].efectivo),
+      tarjetas: Number(ing[0].debito) + Number(ing[0].credito),
+      transferencia: Number(ing[0].transferencia),
+    },
     otrosIngresos,
     gastos,
     gastosCount: Number(gas[0].n),

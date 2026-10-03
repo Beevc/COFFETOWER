@@ -72,6 +72,15 @@ function Resumen({ mes, setMes }) {
             <Metric label="Ingresos (ventas)" value={money(data.ingresos)} icon={TrendingUp} tone="text-frappe-success" sub={`${data.ventasCount} ventas`} />
             <Metric label="Otros ingresos" value={money(data.otrosIngresos)} icon={TrendingUp} tone="text-frappe-success" />
           </div>
+
+          {data.ingresosPorMedio && (
+            <div className="rounded-xl border border-frappe-border bg-frappe-surface px-4 py-3">
+              <div className="mb-2 text-sm font-semibold text-frappe-text">Ingresos por medio (ventas)</div>
+              <div className="flex justify-between py-0.5 text-sm"><span className="text-frappe-textSoft">Efectivo</span><span className="font-semibold text-frappe-text">{money(data.ingresosPorMedio.efectivo)}</span></div>
+              <div className="flex justify-between py-0.5 text-sm"><span className="text-frappe-textSoft">Tarjetas (débito + crédito)</span><span className="font-semibold text-frappe-text">{money(data.ingresosPorMedio.tarjetas)}</span></div>
+              <div className="flex justify-between py-0.5 text-sm"><span className="text-frappe-textSoft">Transferencia</span><span className="font-semibold text-frappe-text">{money(data.ingresosPorMedio.transferencia)}</span></div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <Metric label="Gastos" value={money(data.gastos)} icon={TrendingDown} tone="text-frappe-danger" sub={`${data.gastosCount} facturas`} />
             <Metric label="Retiros" value={money(data.retiros)} icon={ArrowDownCircle} tone="text-frappe-danger" />
