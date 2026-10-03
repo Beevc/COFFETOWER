@@ -44,7 +44,8 @@ export default function VentasPage() {
   }
 
   const t = turno?.totales || { total: 0, efectivo: 0, n_ventas: 0 };
-  const tarjeta = t.total - t.efectivo;
+  const tarjetas = (t.debito || 0) + (t.credito || 0);
+  const transferencia = t.transferencia || 0;
 
   return (
     <div>
@@ -75,7 +76,8 @@ export default function VentasPage() {
             <Metric label="Total del turno" value={money(t.total)} />
             <Metric label="N° de ventas" value={t.n_ventas} />
             <Metric label="Efectivo" value={money(t.efectivo)} />
-            <Metric label="Tarjeta/transf." value={money(tarjeta)} />
+            <Metric label="Tarjetas" value={money(tarjetas)} />
+            <Metric label="Transferencia" value={money(transferencia)} />
           </div>
           <div className="mb-2 text-sm text-frappe-textSoft">
             Cajero: <b className="text-frappe-text">{turno.cajeroNombre}</b> · Inicial{" "}

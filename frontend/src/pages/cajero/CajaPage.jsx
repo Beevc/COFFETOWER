@@ -45,7 +45,8 @@ export default function CajaPage() {
   }
 
   const t = turno.totales || { total: 0, efectivo: 0, n_ventas: 0 };
-  const tarjeta = t.total - t.efectivo;
+  const tarjetas = (t.debito || 0) + (t.credito || 0);
+  const transferencia = t.transferencia || 0;
   const esperado = turno.montoInicial + t.efectivo;
   const dif = contado === "" ? null : Math.trunc(Number(contado)) - esperado;
   const arqueos = turno.arqueos || [];
@@ -71,7 +72,8 @@ export default function CajaPage() {
         <Metric label="Ventas del turno" value={money(t.total)} />
         <Metric label="N° de ventas" value={t.n_ventas} />
         <Metric label="Efectivo" value={money(t.efectivo)} />
-        <Metric label="Tarjeta/transf." value={money(tarjeta)} />
+        <Metric label="Tarjetas" value={money(tarjetas)} />
+        <Metric label="Transferencia" value={money(transferencia)} />
       </div>
       <div className="rounded-xl border border-frappe-border bg-frappe-surface px-4 py-3">
         <div className="text-xs text-frappe-textSoft">Monto inicial</div>
