@@ -8,12 +8,16 @@ const abrirSchema = z.object({
   montoInicial: z.number().int("Debe ser un entero").min(0, "No puede ser negativo"),
 });
 
+const monto = z.number().int("Debe ser un entero").min(0, "No puede ser negativo");
 const cerrarSchema = z.object({
-  efectivoContado: z.number().int("Debe ser un entero").min(0, "No puede ser negativo"),
+  efectivoContado: monto,
+  debitoContado: monto.optional(),
+  creditoContado: monto.optional(),
+  transferenciaContado: monto.optional(),
 });
 
 const arqueoSchema = z.object({
-  efectivoContado: z.number().int("Debe ser un entero").min(0, "No puede ser negativo"),
+  efectivoContado: monto,
   nota: z.string().trim().max(200).optional(),
 });
 
@@ -48,6 +52,12 @@ const publicTurno = (t) => ({
   efectivoEsperado: t.efectivo_esperado,
   efectivoContado: t.efectivo_contado,
   diferencia: t.diferencia,
+  debitoEsperado: t.debito_esperado,
+  debitoContado: t.debito_contado,
+  creditoEsperado: t.credito_esperado,
+  creditoContado: t.credito_contado,
+  transferenciaEsperado: t.transferencia_esperado,
+  transferenciaContado: t.transferencia_contado,
 });
 
 // Devuelve el turno abierto del local (o null) con nombre del cajero.
@@ -69,6 +79,9 @@ async function totalesTurno(turnoId) {
     `SELECT
         COALESCE(SUM(total), 0)::int AS total,
         COALESCE(SUM(total) FILTER (WHERE medio_pago = 'efectivo'), 0)::int AS efectivo,
+        COALESCE(SUM(total) FILTER (WHERE medio_pago = 'debito'), 0)::int AS debito,
+        COALESCE(SUM(total) FILTER (WHERE medio_pago = 'credito'), 0)::int AS credito,
+        COALESCE(SUM(total) FILTER (WHERE medio_pago = 'transferencia'), 0)::int AS transferencia,
         COUNT(*)::int AS n_ventas
        FROM venta
       WHERE caja_turno_id = $1 AND estado = 'activa'`,
@@ -108,7 +121,6 @@ const abrir = asyncHandler(async (req, res) => {
   const { cajeroId, montoInicial } = req.body;
   const localId = req.user.localId;
 
-  // El cajero asignado debe existir, estar activo y ser del local.
   const { rows: cj } = await query(
     "SELECT id, nombre FROM usuario WHERE id = $1 AND local_id = $2 AND rol = 'cajero' AND activo = true",
     [cajeroId, localId]
@@ -124,38 +136,47 @@ const abrir = asyncHandler(async (req, res) => {
     const turno = { ...rows[0], cajero_nombre: cj[0].nombre };
     res.status(201).json({ turno: publicTurno(turno) });
   } catch (err) {
-    // Índice único parcial: ya hay una caja abierta.
-    if (err.code === "23505") {
-      throw new HttpError(409, "Ya hay una caja abierta en el local");
-    }
+    if (err.code === "23505") throw new HttpError(409, "Ya hay una caja abierta en el local");
     throw err;
   }
 });
 
-// POST /api/caja/cerrar
+// POST /api/caja/cerrar  (cuenta cada medio para cuadrar)
 const cerrar = asyncHandler(async (req, res) => {
-  const { efectivoContado } = req.body;
+  const {
+    efectivoContado,
+    debitoContado = 0, creditoContado = 0, transferenciaContado = 0,
+  } = req.body;
   const turno = await turnoAbierto(req.user.localId);
   if (!turno) throw new HttpError(400, "No hay ninguna caja abierta");
 
   const totales = await totalesTurno(turno.id);
-  const esperado = turno.monto_inicial + totales.efectivo;
-  const diferencia = efectivoContado - esperado;
+  const efEsp = turno.monto_inicial + totales.efectivo; // efectivo incluye el fondo inicial
+  const dbEsp = totales.debito, crEsp = totales.credito, trEsp = totales.transferencia;
+  const diferencia = efectivoContado - efEsp; // diferencia principal = efectivo
 
   const { rows } = await query(
     `UPDATE caja_turno
-        SET estado = 'cerrada',
-            cerrada_en = now(),
-            cerrado_por_id = $1,
-            efectivo_esperado = $2,
-            efectivo_contado = $3,
-            diferencia = $4
-      WHERE id = $5
-      RETURNING *`,
-    [req.user.id, esperado, efectivoContado, diferencia, turno.id]
+        SET estado = 'cerrada', cerrada_en = now(), cerrado_por_id = $1,
+            efectivo_esperado = $2, efectivo_contado = $3, diferencia = $4,
+            debito_esperado = $5, debito_contado = $6,
+            credito_esperado = $7, credito_contado = $8,
+            transferencia_esperado = $9, transferencia_contado = $10
+      WHERE id = $11 RETURNING *`,
+    [req.user.id, efEsp, efectivoContado, diferencia,
+     dbEsp, debitoContado, crEsp, creditoContado, trEsp, transferenciaContado, turno.id]
   );
   const cerrado = { ...rows[0], cajero_nombre: turno.cajero_nombre };
-  res.json({ turno: { ...publicTurno(cerrado), totales } });
+
+  // Desglose por medio para cuadrar (esperado vs contado vs diferencia).
+  const medios = [
+    { medio: "efectivo", esperado: efEsp, contado: efectivoContado },
+    { medio: "debito", esperado: dbEsp, contado: debitoContado },
+    { medio: "credito", esperado: crEsp, contado: creditoContado },
+    { medio: "transferencia", esperado: trEsp, contado: transferenciaContado },
+  ].map((m) => ({ ...m, diferencia: m.contado - m.esperado }));
+
+  res.json({ turno: { ...publicTurno(cerrado), totales, medios } });
 });
 
 module.exports = { estado, abrir, cerrar, arqueo, abrirSchema, cerrarSchema, arqueoSchema, turnoAbierto };

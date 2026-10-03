@@ -7,6 +7,7 @@ import { money } from "../../utils/format";
 const inputCls =
   "w-full rounded-lg border border-frappe-border bg-frappe-bg px-3 py-2.5 text-sm text-frappe-text outline-none focus:border-frappe-accent";
 const labelCls = "mb-1 block text-sm text-frappe-textSoft";
+const MEDIO_LABEL = { efectivo: "Efectivo", debito: "Débito", credito: "Crédito", transferencia: "Transferencia" };
 
 function Metric({ label, value }) {
   return (
@@ -24,6 +25,24 @@ function Row({ label, value, bold }) {
     </div>
   );
 }
+// Fila de conteo por medio en el cierre.
+function MedioRow({ label, esperado, value, onChange }) {
+  const dif = value === "" ? null : Math.trunc(Number(value) || 0) - esperado;
+  return (
+    <div className="mb-3">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-sm text-frappe-textSoft">{label}</span>
+        <span className="text-xs text-frappe-textSoft">esperado {money(esperado)}</span>
+      </div>
+      <input type="number" min="0" inputMode="numeric" value={value} onChange={(e) => onChange(e.target.value)} placeholder={money(esperado)} className={inputCls} />
+      {dif !== null && (
+        <div className={`mt-1 text-xs font-semibold ${dif === 0 ? "text-frappe-success" : "text-frappe-danger"}`}>
+          {dif === 0 ? "Cuadra" : `Diferencia: ${dif > 0 ? "+" : ""}${money(dif)}`}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminCajaPage() {
   const [turno, setTurno] = useState(null);
@@ -34,9 +53,12 @@ export default function AdminCajaPage() {
   // Abrir
   const [cajeroId, setCajeroId] = useState("");
   const [montoInicial, setMontoInicial] = useState("20000");
-  // Cerrar
+  // Cerrar (conteo por medio)
   const [cerrando, setCerrando] = useState(false);
-  const [efectivoContado, setEfectivoContado] = useState("");
+  const [efCont, setEfCont] = useState("");
+  const [dbCont, setDbCont] = useState("");
+  const [crCont, setCrCont] = useState("");
+  const [trCont, setTrCont] = useState("");
   const [resumen, setResumen] = useState(null);
 
   const cargar = useCallback(async () => {
@@ -48,10 +70,9 @@ export default function AdminCajaPage() {
   useEffect(() => { cargar().finally(() => setCargando(false)); }, [cargar]);
 
   const abierta = !!turno && turno.estado === "abierta";
-  const t = turno?.totales || { total: 0, efectivo: 0, n_ventas: 0 };
+  const t = turno?.totales || { total: 0, efectivo: 0, debito: 0, credito: 0, transferencia: 0, n_ventas: 0 };
   const tarjeta = t.total - t.efectivo;
-  const esperado = abierta ? turno.montoInicial + t.efectivo : 0;
-  const dif = efectivoContado === "" ? null : Math.trunc(Number(efectivoContado)) - esperado;
+  const espEf = abierta ? turno.montoInicial + t.efectivo : 0;
 
   const abrir = async () => {
     setError("");
@@ -65,14 +86,28 @@ export default function AdminCajaPage() {
     } finally { setProcesando(false); }
   };
 
+  const iniciarCierre = () => {
+    // Prellenar los electrónicos con lo esperado (suelen cuadrar); efectivo se cuenta.
+    setEfCont("");
+    setDbCont(String(t.debito || 0));
+    setCrCont(String(t.credito || 0));
+    setTrCont(String(t.transferencia || 0));
+    setCerrando(true);
+  };
+
   const cerrar = async () => {
     setError("");
     setProcesando(true);
     try {
-      const cerrado = await cajaApi.cerrar(Math.trunc(Number(efectivoContado)));
+      const cerrado = await cajaApi.cerrar({
+        efectivoContado: Math.trunc(Number(efCont) || 0),
+        debitoContado: Math.trunc(Number(dbCont) || 0),
+        creditoContado: Math.trunc(Number(crCont) || 0),
+        transferenciaContado: Math.trunc(Number(trCont) || 0),
+      });
       setResumen(cerrado);
       setCerrando(false);
-      setEfectivoContado("");
+      setEfCont(""); setDbCont(""); setCrCont(""); setTrCont("");
       await cargar();
     } catch (err) {
       setError(err.response?.data?.error || "No se pudo cerrar la caja");
@@ -82,6 +117,8 @@ export default function AdminCajaPage() {
   if (cargando) {
     return <div className="flex items-center justify-center gap-2 py-16 text-frappe-textSoft"><Loader2 size={18} className="animate-spin" /> Cargando…</div>;
   }
+
+  const totalDif = resumen?.medios ? resumen.medios.reduce((s, m) => s + m.diferencia, 0) : 0;
 
   return (
     <div>
@@ -97,25 +134,36 @@ export default function AdminCajaPage() {
 
       {error && <div className="mb-3 rounded-lg bg-frappe-dangerSoft px-3 py-2 text-sm font-medium text-frappe-danger">{error}</div>}
 
-      {/* Resumen de cierre */}
       {resumen && (
         <div className="mb-4 rounded-2xl border border-frappe-border bg-frappe-surface p-5">
           <h2 className="mb-3 font-serif text-lg font-semibold text-frappe-text">Caja cerrada</h2>
           <Row label="Cajero" value={resumen.cajeroNombre} />
           <Row label="Monto inicial" value={money(resumen.montoInicial)} />
-          <Row label="Ventas en efectivo" value={money(resumen.totales.efectivo)} />
-          <Row label="Efectivo esperado" value={money(resumen.efectivoEsperado)} bold />
-          <Row label="Efectivo contado" value={money(resumen.efectivoContado)} />
           <div className="my-2 border-t border-frappe-border" />
-          <div className={`rounded-lg px-3 py-2 text-sm font-semibold ${resumen.diferencia === 0 ? "bg-frappe-successSoft text-frappe-success" : "bg-frappe-dangerSoft text-frappe-danger"}`}>
-            {resumen.diferencia === 0 ? "Cuadratura exacta" : `Diferencia: ${resumen.diferencia > 0 ? "+" : ""}${money(resumen.diferencia)}`}
+          <div className="mb-1 text-xs font-semibold text-frappe-textSoft">Cuadratura por medio</div>
+          <div className="overflow-hidden rounded-xl border border-frappe-border">
+            <div className="grid grid-cols-4 bg-frappe-bg px-3 py-1.5 text-[11px] font-semibold text-frappe-textSoft">
+              <span>Medio</span><span className="text-right">Esperado</span><span className="text-right">Contado</span><span className="text-right">Dif.</span>
+            </div>
+            {resumen.medios.map((m) => (
+              <div key={m.medio} className="grid grid-cols-4 border-t border-frappe-border px-3 py-1.5 text-sm">
+                <span className="text-frappe-text">{MEDIO_LABEL[m.medio]}</span>
+                <span className="text-right text-frappe-textSoft">{money(m.esperado)}</span>
+                <span className="text-right text-frappe-text">{money(m.contado)}</span>
+                <span className={`text-right font-semibold ${m.diferencia === 0 ? "text-frappe-success" : "text-frappe-danger"}`}>
+                  {m.diferencia === 0 ? "0" : `${m.diferencia > 0 ? "+" : ""}${money(m.diferencia)}`}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className={`mt-3 rounded-lg px-3 py-2 text-sm font-semibold ${totalDif === 0 ? "bg-frappe-successSoft text-frappe-success" : "bg-frappe-dangerSoft text-frappe-danger"}`}>
+            {totalDif === 0 ? "Todo cuadra ✓" : `Diferencia total: ${totalDif > 0 ? "+" : ""}${money(totalDif)}`}
           </div>
           <button onClick={() => setResumen(null)} className="mt-4 w-full rounded-lg bg-frappe-accent py-2.5 text-sm font-semibold text-white hover:bg-frappe-accentDark">Entendido</button>
         </div>
       )}
 
       {!abierta && !resumen && (
-        // Abrir caja
         <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-5">
           <div className="mb-1 flex items-center gap-2">
             <Lock size={16} className="text-frappe-danger" />
@@ -175,7 +223,7 @@ export default function AdminCajaPage() {
             </div>
           )}
 
-          <button onClick={() => setCerrando(true)} className="rounded-lg border border-frappe-danger py-2.5 text-sm font-semibold text-frappe-danger transition hover:bg-frappe-dangerSoft">
+          <button onClick={iniciarCierre} className="rounded-lg border border-frappe-danger py-2.5 text-sm font-semibold text-frappe-danger transition hover:bg-frappe-dangerSoft">
             Cerrar caja
           </button>
         </div>
@@ -183,23 +231,18 @@ export default function AdminCajaPage() {
 
       {abierta && cerrando && (
         <div className="rounded-2xl border border-frappe-border bg-frappe-surface p-5">
-          <h2 className="mb-3 font-serif text-lg font-semibold text-frappe-text">Cerrar caja</h2>
+          <h2 className="mb-1 font-serif text-lg font-semibold text-frappe-text">Cerrar caja</h2>
+          <p className="mb-3 text-sm text-frappe-textSoft">Cuenta cada medio para cuadrar el turno.</p>
           <Row label="Cajero" value={turno.cajeroNombre} />
           <Row label="Monto inicial" value={money(turno.montoInicial)} />
-          <Row label="Ventas en efectivo" value={money(t.efectivo)} />
-          <Row label="Ventas con tarjeta/transf." value={money(tarjeta)} />
-          <div className="my-2 border-t border-frappe-border" />
-          <Row label="Efectivo esperado en caja" value={money(esperado)} bold />
-          <label className="mb-1 mt-3 block text-sm text-frappe-textSoft">Efectivo contado</label>
-          <input type="number" min="0" value={efectivoContado} onChange={(e) => setEfectivoContado(e.target.value)} placeholder="Cuenta el dinero en caja" className={inputCls} />
-          {dif !== null && (
-            <div className={`mt-3 rounded-lg px-3 py-2 text-sm font-semibold ${dif === 0 ? "bg-frappe-successSoft text-frappe-success" : "bg-frappe-dangerSoft text-frappe-danger"}`}>
-              {dif === 0 ? "Cuadratura exacta" : `Diferencia: ${dif > 0 ? "+" : ""}${money(dif)}`}
-            </div>
-          )}
+          <div className="my-3 border-t border-frappe-border" />
+          <MedioRow label="Efectivo en caja" esperado={espEf} value={efCont} onChange={setEfCont} />
+          <MedioRow label="Débito" esperado={t.debito} value={dbCont} onChange={setDbCont} />
+          <MedioRow label="Crédito" esperado={t.credito} value={crCont} onChange={setCrCont} />
+          <MedioRow label="Transferencia" esperado={t.transferencia} value={trCont} onChange={setTrCont} />
           <div className="mt-4 flex gap-2">
-            <button onClick={() => { setCerrando(false); setEfectivoContado(""); }} className="flex-1 rounded-lg border border-frappe-border py-2.5 text-sm font-semibold text-frappe-text hover:bg-frappe-bg">Volver</button>
-            <button onClick={cerrar} disabled={efectivoContado === "" || procesando} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-frappe-accent py-2.5 text-sm font-semibold text-white hover:bg-frappe-accentDark disabled:opacity-60">
+            <button onClick={() => setCerrando(false)} className="flex-1 rounded-lg border border-frappe-border py-2.5 text-sm font-semibold text-frappe-text hover:bg-frappe-bg">Volver</button>
+            <button onClick={cerrar} disabled={efCont === "" || procesando} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-frappe-accent py-2.5 text-sm font-semibold text-white hover:bg-frappe-accentDark disabled:opacity-60">
               {procesando && <Loader2 size={15} className="animate-spin" />} Confirmar cierre
             </button>
           </div>
